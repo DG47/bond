@@ -27,16 +27,9 @@ import {
   MedicalServices,
 } from "@mui/icons-material";
 import KeyboardDoubleArrowUpIcon from "@mui/icons-material/KeyboardDoubleArrowUp";
-// import { keyframes } from "@mui/system";
 import { useNavigate, useParams } from "react-router-dom";
 import Papa from "papaparse";
 import Plot from "react-plotly.js";
-
-// Bounce animation
-// const bounce = keyframes`
-//   0%, 100% { transform: translateY(0); }
-//   50% { transform: translateY(-4px); }
-// `;
 
 // TinyDonut component
 function TinyDonut({ percentage = 0, size = 16, strokeWidth = 2, color = "#6c5ce7" }) {
@@ -133,11 +126,12 @@ export default function AccountDetail() {
         const yearsArray = Array.from(yearsSet);
         setAvailableYears(yearsArray);
 
-        // Filter subsidiaries for the selected year.
+        // Filter subsidiaries for the selected year and that have surety_access === "merchants".
         const matched = data
           .filter(
             (r) =>
               r.parent_co === parent &&
+              r.surety_access?.toLowerCase().trim() === "merchants" &&
               r["Performance Years"]?.split(",").map((y) => y.trim()).includes(selectedYear)
           )
           .map((r, i) => ({
@@ -164,7 +158,6 @@ export default function AccountDetail() {
         const data = results.data;
         let totalMembership = 0;
         let totalSavings = 0;
-        // let totalSparx = 0;
         subsidiaries.forEach((sub) => {
           // For both years in this example, use "ID" as key.
           const key = "ID";
@@ -176,7 +169,6 @@ export default function AccountDetail() {
           if (row) {
             totalMembership += parseFloat(row["Membership"]) || 0;
             totalSavings += parseFloat(row["Savings_Gross"]) || 0;
-            // totalSparx += parseFloat(row["sparx"]) || 0;
           }
         });
         const formattedMembership = totalMembership.toLocaleString();

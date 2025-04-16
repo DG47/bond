@@ -1,5 +1,5 @@
 // src/pages/Dashboard.js
-import React, { useEffect, useState, useContext, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -17,7 +17,6 @@ import {
 import { AttachMoney, Group, Storage, AccountBalance } from "@mui/icons-material";
 import { Link } from "react-router-dom";
 import Papa from "papaparse";
-import { AuthContext } from "../context/AuthContext";
 import Plot from "react-plotly.js";
 
 // Helper: extract city and state from an address.
@@ -49,76 +48,62 @@ const Dashboard = () => {
   const [accountsData, setAccountsData] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [bonds, setBonds] = useState(0);
-  const { user } = useContext(AuthContext);
 
   // Scroll to top when component mounts.
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  // Load account info from ACO_subsidiary list CSV
+  // Load account info from ACO_subsidiary list CSV.
   useEffect(() => {
-    if (!user?.email) return; // Proceed only if user email is available
-
-    // Determine allowed surety based on user's email domain.
-    const merchantsDomain = "@merchantsbonding.com";
-    const colonialDomain = "@colonialsurety.com";
-
-    let allowedSurety = "";
-    if (user.email.toLowerCase().includes(merchantsDomain)) {
-      allowedSurety = "merchant";
-    } else if (user.email.toLowerCase().includes(colonialDomain)) {
-      allowedSurety = "colonial";
-    }
-
     Papa.parse("/data/ACO_subsidiary list.csv", {
       download: true,
       header: true,
       complete: (results) => {
-        // Filter rows that have required fields and a surety column.
+        console.log("Parsed ACO CSV rows:", results.data);
+
+        // Filter rows to only those that have required fields and surety_access === "merchants".
         const rows = results.data.filter(
-          (r) => r.parent_co && r.address && r.surety
+          (r) =>
+            r.parent_co &&
+            r.address &&
+            r.surety_access &&
+            r.surety_access.trim().toLowerCase() === "merchants"
         );
+        console.log("Filtered rows with surety_access === 'merchants':", rows);
 
-        // Filter rows based on allowed surety (derived from user's email).
-        const suretyFilteredRows = allowedSurety
-          ? rows.filter((r) => r.surety.trim().toLowerCase() === allowedSurety)
-          : [];
+        const totalBonds = rows.length;
 
-        // Save Bonds count from the filtered rows.
-        const totalBonds = suretyFilteredRows.length;
-
-        // Deduplicate based on parent_co.
+        // Deduplicate by parent_co.
         const seen = new Set();
-        const deduped = suretyFilteredRows.filter((row) => {
+        const deduped = rows.filter((row) => {
           const parent = row.parent_co.trim().toLowerCase();
           if (seen.has(parent)) return false;
           seen.add(parent);
           return true;
         });
+        console.log("Deduplicated rows:", deduped);
 
-        // Map deduplicated rows into the final accounts data structure.
+        // Map deduplicated rows into our accounts data.
         const final = deduped.map((row) => ({
           id: row.ACO_ID,
           name: row.parent_co.trim(),
           hqAddress: extractCityState(row.address),
-          programType: row.program_type,
+          programType: row.program_type
+            ? row.program_type.trim().toUpperCase()
+            : "",
           membership: row.Membership
             ? parseFloat(String(row.Membership).replace(/,/g, ""))
             : 0,
-          surety: row.surety.trim().toLowerCase()
+          surety: row.surety_access ? row.surety_access.trim().toLowerCase() : ""
         }));
+        console.log("Final mapped accounts data:", final);
 
-        // Further filter if allowed ACO IDs exist for the user.
-        const userFiltered = final.filter((acc) =>
-          !user?.allowedACOIDs || user.allowedACOIDs.includes(acc.id)
-        );
-
-        setAccountsData(userFiltered);
+        setAccountsData(final);
         setBonds(totalBonds);
       }
     });
-  }, [user]);
+  }, []);
 
   // Load savings & membership data from shared_savings.csv.
   useEffect(() => {
@@ -126,16 +111,21 @@ const Dashboard = () => {
       download: true,
       header: true,
       complete: (results) => {
+        console.log("Parsed Savings CSV rows:", results.data);
         const data = results.data.map((item) => {
-          const savings = parseFloat(String(item["Savings_Gross"]).replace(/,/g, "")) || 0;
-          const mem = parseFloat(String(item["Membership"]).replace(/,/g, "")) || 0;
+          const savings =
+            parseFloat(String(item["Savings_Gross"]).replace(/,/g, "")) || 0;
+          const mem =
+            parseFloat(String(item["Membership"]).replace(/,/g, "")) || 0;
           return {
             id: item.ID, // Assumes matching ACO_ID.
             savings,
             membership: mem,
-            program_type: item.program_type
+            // Use the "Type" header from shared_savings CSV.
+            program_type: item.Type ? item.Type.trim().toUpperCase() : ""
           };
         });
+        console.log("Mapped savings data:", data);
         setChartData(data);
       }
     });
@@ -148,13 +138,17 @@ const Dashboard = () => {
     accountsData.forEach((acc) => {
       accountMap.set(acc.id, { name: acc.name, program_type: acc.programType });
     });
-    return chartData.map((item) => ({
-      name: accountMap.get(item.id) ? accountMap.get(item.id).name : item.id,
+    const merged = chartData.map((item) => ({
+      name: accountMap.get(item.id)
+        ? accountMap.get(item.id).name
+        : item.id,
       savings: item.savings,
       program_type: accountMap.get(item.id)
         ? accountMap.get(item.id).program_type
         : item.program_type
     }));
+    console.log("Merged data for chart:", merged);
+    return merged;
   }, [accountsData, chartData]);
 
   // Aggregated Stats calculations.
@@ -184,13 +178,14 @@ const Dashboard = () => {
       if (!groups[item.program_type]) groups[item.program_type] = [];
       groups[item.program_type].push(item);
     });
-    // Sort each group descending by savings.
     Object.keys(groups).forEach((pt) => {
       groups[pt].sort((a, b) => b.savings - a.savings);
     });
+    console.log("Grouped data for chart:", groups);
     return groups;
   }, [mergedData]);
 
+  // Define desired order (all uppercase).
   const desiredOrder = ["REACH", "KCC", "MSSP"];
 
   const yOrder = useMemo(() => {
@@ -200,6 +195,7 @@ const Dashboard = () => {
         groupedData[pt].forEach((item) => order.push(item.name));
       }
     });
+    console.log("yOrder for chart:", order);
     return order;
   }, [groupedData]);
 
@@ -217,7 +213,9 @@ const Dashboard = () => {
         const rec = nameToItem.get(name);
         return rec && rec.program_type === pt ? rec.savings : null;
       });
-      const hoverTexts = xValues.map((x) => (x !== null ? (x / 1e6).toFixed(1) + "M" : ""));
+      const hoverTexts = xValues.map((x) =>
+        x !== null ? (x / 1e6).toFixed(1) + "M" : ""
+      );
       return {
         type: "bar",
         orientation: "h",
@@ -227,7 +225,8 @@ const Dashboard = () => {
         marker: { color: getBarColor(pt) },
         customdata: yOrder,
         hovertext: hoverTexts,
-        hovertemplate: "ACO: %{customdata}<br>Savings: $%{hovertext}<extra></extra>"
+        hovertemplate:
+          "ACO: %{customdata}<br>Savings: $%{hovertext}<extra></extra>"
       };
     });
   }, [groupedData, yOrder, nameToItem]);
@@ -240,7 +239,7 @@ const Dashboard = () => {
         px: { xs: 2, sm: 3, md: 4 },
         py: 3,
         boxSizing: "border-box",
-        flexGrow: 1,
+        flexGrow: 1
       }}
     >
       <Typography variant="h5" component="h1" fontWeight="bold" sx={{ mb: 3 }}>
@@ -257,10 +256,10 @@ const Dashboard = () => {
                   {stat.icon}
                 </Avatar>
                 <Box>
-                  <Typography variant="subtitle2" color="textSecondary">
+                  <Typography variant="subtitle2" color="textSecondary" component="div">
                     {stat.title}
                   </Typography>
-                  <Typography variant="h6" fontWeight="bold">
+                  <Typography variant="h6" fontWeight="bold" component="div">
                     {stat.value}
                   </Typography>
                 </Box>
@@ -287,9 +286,9 @@ const Dashboard = () => {
                 title: "",
                 showticklabels: false,
                 categoryorder: "array",
-                categoryarray: yOrder,
+                categoryarray: yOrder
               },
-              margin: { t: 20, r: 30, l: 50, b: 40 },
+              margin: { t: 20, r: 30, l: 50, b: 40 }
             }}
             useResizeHandler
             style={{ width: "100%", height: "400px" }}
@@ -320,12 +319,19 @@ const Dashboard = () => {
                   textDecoration: "none",
                   color: "inherit",
                   cursor: "pointer",
-                  "&:hover": { backgroundColor: "#f5f5f5" },
+                  "&:hover": { backgroundColor: "#f5f5f5" }
                 }}
               >
                 <TableCell>
                   <Box sx={{ display: "flex", alignItems: "center" }}>
-                    <Avatar sx={{ bgcolor: "#e0e0e0", mr: 2, width: 30, height: 30 }}>
+                    <Avatar
+                      sx={{
+                        bgcolor: "#e0e0e0",
+                        mr: 2,
+                        width: 30,
+                        height: 30
+                      }}
+                    >
                       {account.name.charAt(0)}
                     </Avatar>
                     {account.name}

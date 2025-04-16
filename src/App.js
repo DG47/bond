@@ -19,7 +19,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route element={<PrivateRoute />}>
             <Route element={<Layout />}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route index element={<Navigate to="/accounts" replace />} />
               <Route path="accounts" element={<Dashboard />} />
               <Route path="accounts/:id" element={<AccountDetail />} />
               <Route path="accounts/:id/report/2024" element={<AcoReportDetail2024 />} />

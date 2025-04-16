@@ -35,9 +35,9 @@ const Account = () => {
 
   const formik = useFormik({
     initialValues: {
-      firstName: "John",
-      lastName: "Doe",
-      email: "john.doe@example.com",
+      firstName: "",
+      lastName: "",
+      email: "",
       currentPassword: "",
       newPassword: "",
       confirmPassword: ""

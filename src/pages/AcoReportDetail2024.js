@@ -1,5 +1,5 @@
 // src/pages/AcoReportDetail2024.js
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -41,7 +41,6 @@ const defaultMetrics = {
 // Data file URLs for 2024
 const DATA_2024_URL = "/data/2024_data.csv";
 const NPI_OUTPUT_24_URL = "/data/npi_output24.csv";
-const QBR_URL = "/data/DummyDataQBR.csv"; // (Used only if needed)
 const STOPLOSS_URL = "/data/StoplossSumarry.csv";
 
 // Define stoploss thresholds.
@@ -206,7 +205,7 @@ const AcoReportDetail2024 = () => {
   // Component state.
   const [acoName, setAcoName] = useState("");
   const [clinicianCount, setClinicianCount] = useState(0);
-  const [selectedQuarter, setSelectedQuarter] = useState("Q2"); // not used in QBR vs Sparx
+  const [selectedQuarter, setSelectedQuarter] = useState("Q2");
 
   const [bondedAmount, setBondedAmount] = useState(defaultMetrics.bondedAmount);
   const [membership, setMembership] = useState(defaultMetrics.membership);
@@ -234,7 +233,6 @@ const AcoReportDetail2024 = () => {
   const handleMenuClose = () => setMenuAnchor(null);
 
   // ---- Download Functions ----
-  // Download Analysis PDF.
   const handleDownloadPDF = async () => {
     handleMenuClose();
     if (!printRef.current) return;
@@ -258,7 +256,6 @@ const AcoReportDetail2024 = () => {
     pdf.save(`Sparx - ${acoName}.pdf`);
   };
 
-  // Download QBR using mapping.
   const handleDownloadQBRZip = async () => {
     handleMenuClose();
     Papa.parse("/data/ACO_subsidiary list.csv", {
@@ -272,7 +269,7 @@ const AcoReportDetail2024 = () => {
         if (matchingRow && matchingRow.subsidiary_co) {
           const subsidiary_co = matchingRow.subsidiary_co.trim();
           const fileName = qbrMapping[subsidiary_co] || `${subsidiary_co}_QBR.zip`;
-          const fileUrl = `/data/QBRs/${encodeURIComponent(fileName)}`; // QBR files served from /data/qbrs/
+          const fileUrl = `/data/QBRs/${encodeURIComponent(fileName)}`;
           const a = document.createElement("a");
           a.href = fileUrl;
           a.download = fileName;
@@ -290,7 +287,6 @@ const AcoReportDetail2024 = () => {
     });
   };
 
-  // Download Financials using mapping.
   const handleDownloadFinancialZip = async () => {
     handleMenuClose();
     Papa.parse("/data/ACO_subsidiary list.csv", {
@@ -304,7 +300,7 @@ const AcoReportDetail2024 = () => {
         if (matchingRow && matchingRow.parent_co) {
           const parentCo = matchingRow.parent_co.trim();
           const fileName = financialMapping[parentCo] || `${parentCo}_Financials.zip`;
-          const fileUrl = `/data/financials/${encodeURIComponent(fileName)}`; // Financials files served from /data/financials/
+          const fileUrl = `/data/financials/${encodeURIComponent(fileName)}`;
           const a = document.createElement("a");
           a.href = fileUrl;
           a.download = fileName;
@@ -323,7 +319,6 @@ const AcoReportDetail2024 = () => {
   };
 
   // ---- Data Loaders ----
-  // Load Bonded Amount from DATA_2024_URL.
   useEffect(() => {
     parseCsv(DATA_2024_URL).then((data) => {
       const row = data.find(
@@ -335,7 +330,6 @@ const AcoReportDetail2024 = () => {
     });
   }, [id]);
 
-  // Load Additional Data (Membership, sparx score, Projected PMPM) for 2024.
   const loadAdditionalData = async () => {
     try {
       const sharedData = await parseCsv(DATA_2024_URL);
@@ -346,7 +340,6 @@ const AcoReportDetail2024 = () => {
       const mem = parseFloat(row["Membership"]) || 0;
       setMembership(mem.toLocaleString());
       setSparxScore(row["sparx"] ? row["sparx"].toString() : "");
-      // For 2024, use Q4 Spend for Projected PMPM.
       const q4Spend = parseFloat(String(row["Q4 Spend"]).replace(/[$,%]/g, "").trim()) || 0;
       const q4Formatted = Number(q4Spend).toLocaleString(undefined, {
         minimumFractionDigits: 2,
@@ -363,7 +356,6 @@ const AcoReportDetail2024 = () => {
     }
   };
 
-  // Load Benchmark vs Expenditure Graph from DATA_2024_URL.
   const loadBenchmarkExpenditureGraph = async () => {
     try {
       const sharedData = await parseCsv(DATA_2024_URL);
@@ -407,7 +399,6 @@ const AcoReportDetail2024 = () => {
     }
   };
 
-  // Load QBR vs Sparx data using columns: Q3 Benchmark, Q3 Spend, QBR Benchmark, QBR Spend.
   const loadQBRVsSparxData = async () => {
     try {
       const data = await parseCsv(DATA_2024_URL);
@@ -452,7 +443,6 @@ const AcoReportDetail2024 = () => {
     }
   };
 
-  // Load Shared Savings Graph from DATA_2024_URL.
   const loadSharedSavingsData = async () => {
     try {
       const sharedData = await parseCsv(DATA_2024_URL);
@@ -492,7 +482,7 @@ const AcoReportDetail2024 = () => {
     }
   };
 
-  // Load Monthly Graphs (Paid PMPM by Claim Type and Expense Distribution) from DATA_2024_URL.
+  // Load Monthly Graphs: "Monthly Paid PMPM by Claim Type" and "Monthly Expense Distribution (%)"
   const loadClaimsAndEnrollData = async (currentAcoName) => {
     const lowerId = id.toLowerCase().trim();
     const enrollData = await parseCsv(DATA_2024_URL);
@@ -537,9 +527,30 @@ const AcoReportDetail2024 = () => {
     const quarters = Object.keys(enrollByQuarter)
       .map((m) => parseInt(m, 10))
       .sort((a, b) => a - b);
-    const monthMap = { 1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun", 7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec" };
+    const monthMap = {
+      1: "Jan",
+      2: "Feb",
+      3: "Mar",
+      4: "Apr",
+      5: "May",
+      6: "Jun",
+      7: "Jul",
+      8: "Aug",
+      9: "Sep",
+      10: "Oct",
+      11: "Nov",
+      12: "Dec",
+    };
     const monthLabels = quarters.map((m) => monthMap[m] || m.toString());
-    const categories = ["Inpatient", "SNF", "HHA", "Hospice", "Professional", "Outpatient", "DME"];
+    const categories = [
+      "Inpatient",
+      "SNF",
+      "HHA",
+      "Hospice",
+      "Professional",
+      "Outpatient",
+      "DME",
+    ];
     const pmpmData = {};
     const percentageData = {};
     categories.forEach((cat) => {
@@ -579,6 +590,7 @@ const AcoReportDetail2024 = () => {
       type: "bar",
       marker: { color: pastelColors[i], ticksuffix: "%" },
     }));
+    // ---- Monthly Paid PMPM by Claim Type ----
     setQuarterlyPmpmPlot({
       data: pmpmTraces,
       layout: {
@@ -588,6 +600,7 @@ const AcoReportDetail2024 = () => {
         yaxis: { title: { text: "PMPM" }, tickprefix: "$" },
       },
     });
+    // ---- Monthly Expense Distribution (%) ----
     setQuarterlyPercentagePlot({
       data: percentageTraces,
       layout: {
@@ -674,7 +687,7 @@ const AcoReportDetail2024 = () => {
       await loadNPIExcel();
       await loadAllData();
       await loadBenchmarkExpenditureGraph();
-      await loadQBRVsSparxData(); // Load QBR vs Sparx data
+      await loadQBRVsSparxData();
       await loadStoplossData();
       await loadProviderData();
       await loadSharedSavingsData();
@@ -683,7 +696,7 @@ const AcoReportDetail2024 = () => {
     init();
   }, [id, selectedQuarter]);
 
-  // Static fallback for Shared Savings.
+  // Static fallback Shared Savings.
   const line2024Trace = {
     x: ["Q1", "Q2", "Q3", "Q4"],
     y: [5, 5, 5, 5],
@@ -713,13 +726,15 @@ const AcoReportDetail2024 = () => {
         )
       : null;
 
-  // Define metrics for display.
+  // ---- Updated Metrics ----
+  // "Bonded Amount" is loaded from DATA_2024_URL via its bond_amount field.
+  // "Physicians" metric now uses the clinicianCount value.
   const metricsWithValuesDisplay = [
     { title: "Bonded Amount", value: bondedAmount, icon: <AttachMoney fontSize="large" /> },
     { title: "Membership", value: membership, icon: <Group fontSize="large" /> },
     { title: "Sparx Score", value: sparxScore, icon: <BarChart fontSize="large" /> },
     { title: "Stop Loss", value: stopLoss, icon: <Shield fontSize="large" /> },
-    { title: "Clinicians", value: "1,340", icon: <MedicalServices fontSize="large" /> },
+    { title: "Physicians", value: clinicianCount ? clinicianCount.toLocaleString() : "0", icon: <MedicalServices fontSize="large" /> },
     { title: "Projected PMPM", value: projectedPMPM, icon: <TrendingUp fontSize="large" /> },
   ];
 
@@ -768,11 +783,13 @@ const AcoReportDetail2024 = () => {
         {metricsWithValuesDisplay.map((item, index) => (
           <Card key={index} sx={{ height: "100%", minHeight: 80 }}>
             <CardContent sx={{ display: "flex", alignItems: "center", py: 2 }}>
-              <Avatar sx={{ bgcolor: "#6c5ce7", width: 48, height: 48, mr: 2 }}>{item.icon}</Avatar>
+              <Avatar sx={{ bgcolor: "#6c5ce7", width: 48, height: 48, mr: 2 }}>
+                {item.icon}
+              </Avatar>
               <Box>
                 <Typography variant="body1" fontWeight="medium">{item.title}</Typography>
                 <Typography variant="h5" fontWeight="bold">
-                  {item.title === "Clinicians" ? clinicianCount.toLocaleString() : item.value}
+                  {item.value}
                 </Typography>
               </Box>
             </CardContent>
@@ -782,7 +799,9 @@ const AcoReportDetail2024 = () => {
 
       {/* Shared Savings Chart */}
       <Box sx={{ mb: 5 }}>
-        <Typography variant="h6" fontWeight="bold" gutterBottom>Shared Savings</Typography>
+        <Typography variant="h6" fontWeight="bold" gutterBottom>
+          Shared Savings
+        </Typography>
         <Paper elevation={3} sx={{ p: 2 }}>
           <Plot
             data={confidenceData.length > 0 ? confidenceData : [line2024Trace]}
@@ -833,7 +852,9 @@ const AcoReportDetail2024 = () => {
       {/* Monthly Paid PMPM by Claim Type */}
       {quarterlyPmpmPlot && (
         <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>Monthly Paid PMPM by Claim Type</Typography>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            Monthly Paid PMPM by Claim Type
+          </Typography>
           <Paper elevation={3} sx={{ p: 2 }}>
             <Plot
               data={quarterlyPmpmPlot.data}
@@ -849,7 +870,9 @@ const AcoReportDetail2024 = () => {
       {/* Monthly Expense Distribution (%) */}
       {quarterlyPercentagePlot && (
         <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>Monthly Expense Distribution (%)</Typography>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            Monthly Expense Distribution (%)
+          </Typography>
           <Paper elevation={3} sx={{ p: 2 }}>
             <Plot
               data={quarterlyPercentagePlot.data}
@@ -865,7 +888,9 @@ const AcoReportDetail2024 = () => {
       {/* Latest Industry Results - Member Months vs PMPM */}
       {pmpmPlot && (
         <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>Latest Industry Results - Member Months vs PMPM</Typography>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            Latest Industry Results - Member Months vs PMPM
+          </Typography>
           <Paper elevation={3} sx={{ p: 2 }}>
             <Plot
               data={[pmpmPlot]}
@@ -886,7 +911,9 @@ const AcoReportDetail2024 = () => {
       {/* Latest Industry Results - Percentile Rank of Quality Scores */}
       {qualityPlot && (
         <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>Latest Industry Results - Percentile Rank of Quality Scores</Typography>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            Latest Industry Results - Percentile Rank of Quality Scores
+          </Typography>
           <Paper elevation={3} sx={{ p: 2 }}>
             <Plot
               data={[qualityPlot]}
@@ -907,7 +934,9 @@ const AcoReportDetail2024 = () => {
       {/* Provider Map & Physician Breakdown */}
       {providerMapPlot && (
         <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>Geographic Distribution of Providers</Typography>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            Geographic Distribution of Providers
+          </Typography>
           <Paper elevation={3} sx={{ p: 2 }}>
             <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 2 }}>
               <Box sx={{ flex: 3 }}>
@@ -920,7 +949,9 @@ const AcoReportDetail2024 = () => {
                 />
               </Box>
               <Box sx={{ flex: 1, minWidth: 200, border: "1px solid #e0e0e0", borderRadius: 2, p: 2 }}>
-                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>Physician Breakdown</Typography>
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                  Physician Breakdown
+                </Typography>
                 {Object.entries(physicianBreakdown)
                   .filter(([cat, pct]) => pct > 0)
                   .map(([cat, pct]) => (
@@ -928,7 +959,15 @@ const AcoReportDetail2024 = () => {
                       <Typography variant="body2" sx={{ mb: 0.5 }}>
                         {cat} — {pct}%
                       </Typography>
-                      <Box sx={{ backgroundColor: "#f0f0f0", borderRadius: 1, height: 8, width: "100%", position: "relative" }}>
+                      <Box
+                        sx={{
+                          backgroundColor: "#f0f0f0",
+                          borderRadius: 1,
+                          height: 8,
+                          width: "100%",
+                          position: "relative",
+                        }}
+                      >
                         <Box sx={{ backgroundColor: "#6c5ce7", height: "100%", width: `${pct}%`, borderRadius: 1 }} />
                       </Box>
                     </Box>
@@ -942,7 +981,9 @@ const AcoReportDetail2024 = () => {
       {/* Stop Loss Payouts */}
       {stoplossEntity && (
         <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>Stop Loss Payouts</Typography>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            Stop Loss Payouts
+          </Typography>
           <Paper elevation={3} sx={{ p: 2 }}>
             <Plot
               data={[
@@ -1011,7 +1052,9 @@ const AcoReportDetail2024 = () => {
       {/* Latest Industry Results - Member Months vs PMPM */}
       {pmpmPlot && (
         <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>Latest Industry Results - Member Months vs PMPM</Typography>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            Latest Industry Results - Member Months vs PMPM
+          </Typography>
           <Paper elevation={3} sx={{ p: 2 }}>
             <Plot
               data={[pmpmPlot]}
@@ -1032,7 +1075,9 @@ const AcoReportDetail2024 = () => {
       {/* Latest Industry Results - Percentile Rank of Quality Scores */}
       {qualityPlot && (
         <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>Latest Industry Results - Percentile Rank of Quality Scores</Typography>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            Latest Industry Results - Percentile Rank of Quality Scores
+          </Typography>
           <Paper elevation={3} sx={{ p: 2 }}>
             <Plot
               data={[qualityPlot]}

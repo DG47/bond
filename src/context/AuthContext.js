@@ -1,6 +1,6 @@
 // src/context/AuthContext.js
-import React, { createContext, useState, useEffect } from "react";
-import AuthService from "../services/auth";
+import React, { createContext, useState, useEffect } from 'react';
+import AuthService from '../services/auth';
 
 export const AuthContext = createContext();
 
@@ -31,8 +31,9 @@ export const AuthProvider = ({ children }) => {
     setCurrentUser(null);
   };
 
+  // IMPORTANT: provide the user property
   const value = {
-    user: currentUser, // The logged-in user object, containing email, etc.
+    user: currentUser,
     login,
     logout
   };
