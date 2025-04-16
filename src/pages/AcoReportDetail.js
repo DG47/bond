@@ -28,7 +28,6 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import JSZip from "jszip";
 
 // Default metric values (will be updated dynamically)
 const defaultMetrics = {
@@ -46,7 +45,6 @@ const KCC_URL = "/data/KCC_PUF2023.csv";
 const NPI_XLSX_URL = "/data/2025 NPI List Sample.xlsx";
 const ENROLL_URL = "/data/MEXPR - DATA_ENROLL.xlsx";
 const CLAIMS_URL = "/data/MEXPR - DATA_CLAIMS.xlsx";
-const QBR_URL = "/data/DummyDataQBR.csv";
 const STOPLOSS_URL = "/data/StoplossSumarry.csv";
 const NPI_OUTPUT_URL = "/data/npi_output.csv";
 const SHARED_SAVINGS_URL = "/data/shared_savings.csv";

@@ -10,9 +10,6 @@ import {
   Paper,
   Menu,
   MenuItem,
-  FormControl,
-  Select,
-  InputLabel,
 } from "@mui/material";
 import {
   AttachMoney,
@@ -27,7 +24,6 @@ import Plot from "react-plotly.js";
 import Papa from "papaparse";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import JSZip from "jszip";
 
 // Default metric values for 2024 (initially zeroed)
 const defaultMetrics = {
