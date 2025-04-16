@@ -1,3 +1,4 @@
+// src/App.js
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
@@ -17,13 +18,21 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+
+          {/* All routes below require auth */}
           <Route element={<PrivateRoute />}>
             <Route element={<Layout />}>
               <Route index element={<Navigate to="/accounts" replace />} />
               <Route path="accounts" element={<Dashboard />} />
               <Route path="accounts/:id" element={<AccountDetail />} />
-              <Route path="accounts/:id/report/2024" element={<AcoReportDetail2024 />} />
-              <Route path="accounts/:id/report/2025" element={<AcoReportDetail />} />
+              <Route
+                path="accounts/:id/report/2024"
+                element={<AcoReportDetail2024 />}
+              />
+              <Route
+                path="accounts/:id/report/2025"
+                element={<AcoReportDetail />}
+              />
               <Route path="summary" element={<Summary />} />
               <Route path="account" element={<Account />} />
             </Route>

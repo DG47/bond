@@ -1,10 +1,11 @@
+// src/components/Login.js
 import React, { useContext, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import {
-  Container,
   Box,
+  Container,
   TextField,
   Button,
   Typography,
@@ -29,9 +30,12 @@ const Login = () => {
       password: Yup.string().required('Required'),
     }),
     onSubmit: async (values) => {
+      setError(null);
       try {
+        // login returns { access, refresh, user }
         await login(values.email, values.password);
-        navigate('/accounts');
+        // redirect and replace history so user can’t go back to login
+        navigate('/accounts', { replace: true });
       } catch (err) {
         setError('Invalid email or password');
       }
@@ -48,18 +52,14 @@ const Login = () => {
         position: 'relative',
       }}
     >
-      {/* Logo in top-left */}
+      {/* Logo */}
       <Box sx={{ position: 'absolute', top: 24, left: 24 }}>
         <Link to="/login">
-          <img
-            src="/logo.png"
-            alt="Sparx Logo"
-            style={{ height: 40 }}
-          />
+          <img src="/logo.png" alt="Sparx Logo" style={{ height: 40 }} />
         </Link>
       </Box>
 
-      {/* Centered login card */}
+      {/* Centered form */}
       <Box
         sx={{
           flexGrow: 1,
@@ -70,12 +70,10 @@ const Login = () => {
       >
         <Container maxWidth="sm">
           <Card sx={{ borderRadius: 3, boxShadow: 3 }}>
-            <CardContent sx={{ padding: 4 }}>
-              <Box sx={{ textAlign: 'center', mb: 4 }}>
-                <Typography variant="h4" component="h1" fontWeight="bold">
-                  Partner Portal
-                </Typography>
-              </Box>
+            <CardContent sx={{ p: 4 }}>
+              <Typography variant="h4" align="center" fontWeight="bold" mb={4}>
+                Partner Portal
+              </Typography>
 
               {error && (
                 <Alert severity="error" sx={{ mb: 3 }}>
@@ -84,7 +82,7 @@ const Login = () => {
               )}
 
               <form onSubmit={formik.handleSubmit}>
-                <Box sx={{ mb: 3 }}>
+                <Box mb={3}>
                   <TextField
                     fullWidth
                     id="email"
@@ -97,14 +95,14 @@ const Login = () => {
                     helperText={formik.touched.email && formik.errors.email}
                   />
                 </Box>
-                <Box sx={{ mb: 4 }}>
+                <Box mb={4}>
                   <TextField
                     fullWidth
                     id="password"
                     name="password"
+                    type="password"
                     label="Password"
                     variant="outlined"
-                    type="password"
                     value={formik.values.password}
                     onChange={formik.handleChange}
                     error={
@@ -113,7 +111,6 @@ const Login = () => {
                     helperText={formik.touched.password && formik.errors.password}
                   />
                 </Box>
-
                 <Button
                   type="submit"
                   fullWidth
@@ -121,9 +118,8 @@ const Login = () => {
                   sx={{
                     backgroundColor: '#6c5ce7',
                     py: 1.5,
-                    '&:hover': {
-                      backgroundColor: '#5346d9',
-                    },
+                    textTransform: 'none',
+                    '&:hover': { backgroundColor: '#5346d9' },
                   }}
                 >
                   Sign In

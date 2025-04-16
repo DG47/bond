@@ -457,7 +457,7 @@ export default function AccountDetail() {
                   <TableCell>
                     <Box sx={{ display: "inline-flex", alignItems: "center" }}>
                       {aco.projectedSavings || "N/A"}
-                      <KeyboardDoubleArrowUpIcon sx={{ ml: 0.5, color: "green" }} />
+                      {/*<KeyboardDoubleArrowUpIcon sx={{ ml: 0.5, color: "green" }} />*/}
                     </Box>
                   </TableCell>
                   <TableCell>

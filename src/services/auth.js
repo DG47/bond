@@ -1,32 +1,38 @@
+// src/services/AuthService.js
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL =
+  process.env.REACT_APP_API_BASE_URL?.replace(/\/+$/, '') || // strip any trailing slash
+  'http://localhost:8000/api';
 
-const login = async (email, password) => {
-    const response = await axios.post(`${API_URL}/login`, {
-        username: email,
-        password: password,
-    });
+export const login = async (username, password) => {
+  const response = await axios.post(
+    // ensure there's exactly one slash between base and path
+    `${API_URL}/login/`,
+    { username, password }
+  );
 
-    if (response.data.accessToken) {
-        localStorage.setItem('user', JSON.stringify(response.data));
-    }
+  // Django Simple JWT returns { access, refresh, user: { … } }
+  if (response.data.access) {
+    // store entire auth payload (so you've got refresh too)
+    localStorage.setItem('user', JSON.stringify(response.data));
+  }
 
-    return response.data;
+  return response.data;
 };
 
-const logout = () => {
-    localStorage.removeItem('user');
+export const logout = () => {
+  localStorage.removeItem('user');
 };
 
-const getCurrentUser = () => {
-    return JSON.parse(localStorage.getItem('user'));
+export const getCurrentUser = () => {
+  return JSON.parse(localStorage.getItem('user'));
 };
 
 const AuthService = {
-    login,
-    logout,
-    getCurrentUser,
+  login,
+  logout,
+  getCurrentUser,
 };
 
 export default AuthService;

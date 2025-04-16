@@ -1,4 +1,5 @@
-// src/pages/AcoReportDetail2024.js
+// at the very top of src/pages/AcoReportDetail2024.js
+import * as XLSX from "xlsx";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   Box,
@@ -38,6 +39,9 @@ const defaultMetrics = {
 const DATA_2024_URL = "/data/2024_data.csv";
 const NPI_OUTPUT_24_URL = "/data/npi_output24.csv";
 const STOPLOSS_URL = "/data/StoplossSumarry.csv";
+
+const ENROLL_URL = "/data/MEXPR - DATA_ENROLL.xlsx";
+const CLAIMS_URL = "/data/MEXPR - DATA_CLAIMS.xlsx";
 
 // Define stoploss thresholds.
 const stoplossThresholds = [
@@ -119,6 +123,31 @@ const parseCsv = (url) =>
       complete: (results) => resolve(results.data),
     });
   });
+const parseExcelBySheet = async (fileUrl, targetId) => {
+  try {
+    const resp = await fetch(fileUrl);
+    const buffer = await resp.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: "array" });
+    let data = [];
+    wb.SheetNames.forEach((name) => {
+      const sheet = wb.Sheets[name];
+      const rows = XLSX.utils.sheet_to_json(sheet);
+      data = data.concat(
+        rows.filter(
+          (r) =>
+            (r.ACO_ID || "")
+              .toString()
+              .toLowerCase()
+              .trim() === targetId.toLowerCase().trim()
+        )
+      );
+    });
+    return data;
+  } catch (e) {
+    console.error("Error parsing Excel file:", e);
+    return [];
+  }
+};
 
 // For 2024 data we only use CSV parsing.
 const loadNPIExcel = async () => {
@@ -827,24 +856,6 @@ const AcoReportDetail2024 = () => {
         </Box>
       )}
 
-      {/* QBR vs Sparx Graph */}
-      {qbrPlot && (
-        <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            QBR vs Sparx (2024)
-          </Typography>
-          <Paper elevation={3} sx={{ p: 2 }}>
-            <Plot
-              data={qbrPlot.data}
-              layout={qbrPlot.layout}
-              config={{ scrollZoom: false }}
-              useResizeHandler
-              style={{ width: "100%", height: "400px" }}
-            />
-          </Paper>
-        </Box>
-      )}
-
       {/* Monthly Paid PMPM by Claim Type */}
       {quarterlyPmpmPlot && (
         <Box sx={{ mb: 5 }}>
@@ -881,51 +892,6 @@ const AcoReportDetail2024 = () => {
         </Box>
       )}
 
-      {/* Latest Industry Results - Member Months vs PMPM */}
-      {pmpmPlot && (
-        <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Latest Industry Results - Member Months vs PMPM
-          </Typography>
-          <Paper elevation={3} sx={{ p: 2 }}>
-            <Plot
-              data={[pmpmPlot]}
-              layout={{
-                autosize: true,
-                xaxis: { title: { text: "Total Member Months" } },
-                yaxis: { title: { text: "PMPM Cost" }, tickprefix: "$" },
-                hovermode: "closest",
-              }}
-              config={{ scrollZoom: false }}
-              useResizeHandler
-              style={{ width: "100%", height: "100%" }}
-            />
-          </Paper>
-        </Box>
-      )}
-
-      {/* Latest Industry Results - Percentile Rank of Quality Scores */}
-      {qualityPlot && (
-        <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Latest Industry Results - Percentile Rank of Quality Scores
-          </Typography>
-          <Paper elevation={3} sx={{ p: 2 }}>
-            <Plot
-              data={[qualityPlot]}
-              layout={{
-                autosize: true,
-                xaxis: { title: { text: "Percentile Rank" }, ticksuffix: "%" },
-                yaxis: { title: { text: "Total Quality Score" }, ticksuffix: "%" },
-                hovermode: "closest",
-              }}
-              config={{ scrollZoom: false }}
-              useResizeHandler
-              style={{ width: "100%", height: "100%" }}
-            />
-          </Paper>
-        </Box>
-      )}
 
       {/* Provider Map & Physician Breakdown */}
       {providerMapPlot && (
@@ -970,6 +936,24 @@ const AcoReportDetail2024 = () => {
                   ))}
               </Box>
             </Box>
+          </Paper>
+        </Box>
+      )}
+
+      {/* QBR vs Sparx Graph */}
+      {qbrPlot && (
+        <Box sx={{ mb: 5 }}>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            QBR vs Sparx (2024)
+          </Typography>
+          <Paper elevation={3} sx={{ p: 2 }}>
+            <Plot
+              data={qbrPlot.data}
+              layout={qbrPlot.layout}
+              config={{ scrollZoom: false }}
+              useResizeHandler
+              style={{ width: "100%", height: "400px" }}
+            />
           </Paper>
         </Box>
       )}
@@ -1044,6 +1028,7 @@ const AcoReportDetail2024 = () => {
           </Paper>
         </Box>
       )}
+
 
       {/* Latest Industry Results - Member Months vs PMPM */}
       {pmpmPlot && (
