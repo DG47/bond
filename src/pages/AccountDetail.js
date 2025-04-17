@@ -31,7 +31,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import Papa from "papaparse";
 import Plot from "react-plotly.js";
 
-// TinyDonut component
 function TinyDonut({ percentage = 0, size = 16, strokeWidth = 2, color = "#6c5ce7" }) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -66,73 +65,59 @@ export default function AccountDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  // Scroll to top when component mounts.
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
-
-  // Expanded row for table.
   const [expandedRow, setExpandedRow] = useState(null);
   const handleExpandClick = (targetId) =>
     setExpandedRow((prev) => (prev === targetId ? null : targetId));
 
-  // State for subsidiaries and account stats.
   const [subsidiaries, setSubsidiaries] = useState([]);
+  const [subsidiariesLoaded, setSubsidiariesLoaded] = useState(false);
   const [accountStats, setAccountStats] = useState([]);
   const [parentName, setParentName] = useState("");
   const [parentStopLoss, setParentStopLoss] = useState("");
   const [selectedYear, setSelectedYear] = useState("2025");
-
-  // NEW: State to hold available years (e.g., ["2024", "2025"])
   const [availableYears, setAvailableYears] = useState([]);
-
-  // Mapping from subsidiary id -> shared savings Plotly data.
   const [subsidiarySharedSavings, setSubsidiarySharedSavings] = useState({});
-  // Mapping from subsidiary id -> clinician count.
   const [subsidiaryClinicianCount, setSubsidiaryClinicianCount] = useState({});
 
-  // Utility function to parse a value as one decimal.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const parseOneDecimal = (value) => {
     if (value == null) return 0;
     const num = parseFloat(String(value).replace(/[$,%]/g, "").trim());
     return isNaN(num) ? 0 : parseFloat(num.toFixed(1));
   };
 
-  // Load ACO_subsidiary list and update parent and subsidiaries info.
   useEffect(() => {
+    setSubsidiariesLoaded(false);
     Papa.parse("/data/ACO_subsidiary list.csv", {
       download: true,
       header: true,
       complete: (results) => {
         const data = results.data;
-        // Find parent's row (assuming parent's ACO_ID matches the id).
         const parentRow = data.find(
           (r) => r.ACO_ID?.toLowerCase().trim() === id.toLowerCase().trim()
         );
         if (!parentRow) return;
-        const parent = parentRow.parent_co || "Unknown Parent";
-        setParentName(parent);
+        setParentName(parentRow.parent_co || "Unknown Parent");
         setParentStopLoss(parentRow.stop_loss || "$350K");
-
-        // NEW: Compute available years from the parent's group
         const yearsSet = new Set();
         data.forEach((r) => {
-          if (r.parent_co === parent && r["Performance Years"]) {
-            r["Performance Years"]
-              .split(",")
-              .forEach((year) => yearsSet.add(year.trim()));
+          if (r.parent_co === parentRow.parent_co && r["Performance Years"]) {
+            r["Performance Years"].split(",").forEach((y) => yearsSet.add(y.trim()));
           }
         });
-        const yearsArray = Array.from(yearsSet);
-        setAvailableYears(yearsArray);
-
-        // Filter subsidiaries for the selected year and that have surety_access === "merchants".
+        setAvailableYears(Array.from(yearsSet));
         const matched = data
           .filter(
             (r) =>
-              r.parent_co === parent &&
+              r.parent_co === parentRow.parent_co &&
               r.surety_access?.toLowerCase().trim() === "merchants" &&
-              r["Performance Years"]?.split(",").map((y) => y.trim()).includes(selectedYear)
+              r["Performance Years"]
+                ?.split(",")
+                .map((y) => y.trim())
+                .includes(selectedYear)
           )
           .map((r, i) => ({
             id: r.ACO_ID || i,
@@ -143,12 +128,13 @@ export default function AccountDetail() {
             action: "View Report",
           }));
         setSubsidiaries(matched);
+        setSubsidiariesLoaded(true);
       },
     });
   }, [id, selectedYear]);
 
-  // Account Stats Effect: Aggregating Generated Savings, Membership, Bonds.
   useEffect(() => {
+    if (!subsidiariesLoaded) return;
     const csvFile =
       selectedYear === "2024" ? "/data/2024_data.csv" : "/data/shared_savings.csv";
     Papa.parse(csvFile, {
@@ -159,30 +145,24 @@ export default function AccountDetail() {
         let totalMembership = 0;
         let totalSavings = 0;
         subsidiaries.forEach((sub) => {
-          // For both years in this example, use "ID" as key.
-          const key = "ID";
           const row = data.find(
             (r) =>
-              (r[key] || "").toLowerCase().trim() ===
-              sub.id.toString().toLowerCase().trim()
+              (r.ID || "").toLowerCase().trim() === sub.id.toString().toLowerCase().trim()
           );
           if (row) {
-            totalMembership += parseFloat(row["Membership"]) || 0;
-            totalSavings += parseFloat(row["Savings_Gross"]) || 0;
+            totalMembership += parseFloat(row.Membership) || 0;
+            totalSavings += parseFloat(row.Savings_Gross) || 0;
           }
         });
-        const formattedMembership = totalMembership.toLocaleString();
-        const formattedSavings = "$" + Math.round(totalSavings).toLocaleString();
         setAccountStats([
-          { title: "Generated Savings", value: formattedSavings, icon: <AttachMoney /> },
-          { title: "Membership", value: formattedMembership, icon: <Group /> },
-          { title: "Bonds", value: subsidiaries.length.toString(), icon: <Storage /> },
+          { title: "Generated Savings", value: "$" + Math.round(totalSavings).toLocaleString(), icon: <AttachMoney /> },
+          { title: "Membership",      value: totalMembership.toLocaleString(),                  icon: <Group /> },
+          { title: "Bonds",           value: subsidiaries.length.toString(),                    icon: <Storage /> },
         ]);
       },
     });
-  }, [subsidiaries, selectedYear]);
+  }, [subsidiariesLoaded, subsidiaries, selectedYear]);
 
-  // Update each subsidiary’s Projected Savings and Sparx Score.
   useEffect(() => {
     if (subsidiaries.length === 0) return;
     const csvFile =
@@ -192,35 +172,24 @@ export default function AccountDetail() {
       header: true,
       complete: (results) => {
         const data = results.data;
-        const key = "ID";
-        const updatedSubs = subsidiaries.map((sub) => {
+        const updated = subsidiaries.map((sub) => {
           const row = data.find(
             (r) =>
-              (r[key] || "").toLowerCase().trim() ===
+              (r.ID || "").toLowerCase().trim() ===
               sub.id.toString().toLowerCase().trim()
           );
-          if (row) {
-            return {
-              ...sub,
-              projectedSavings:
-                selectedYear === "2024"
-                  ? row["Q4"]
-                    ? `${parseOneDecimal(row["Q4"]).toLocaleString()}%`
-                    : ""
-                  : row["Q2"]
-                  ? `${parseOneDecimal(row["Q2"]).toLocaleString()}%`
-                  : "",
-              score: row["sparx"] ? row["sparx"].toString() : sub.score,
-            };
-          }
-          return sub;
+          if (!row) return sub;
+          const savings =
+            selectedYear === "2024"
+              ? row["Q4"] ? `${parseOneDecimal(row["Q4"]).toLocaleString()}%` : ""
+              : row["Q2"] ? `${parseOneDecimal(row["Q2"]).toLocaleString()}%` : "";
+          return { ...sub, projectedSavings: savings, score: row.sparx?.toString() || sub.score };
         });
-        setSubsidiaries(updatedSubs);
+        setSubsidiaries(updated);
       },
     });
   }, [subsidiaries, selectedYear]);
 
-  // Load shared savings data for each subsidiary (for the chart).
   useEffect(() => {
     if (subsidiaries.length === 0) return;
     const csvFile =
@@ -230,78 +199,34 @@ export default function AccountDetail() {
       header: true,
       complete: (results) => {
         const data = results.data;
-        const newMapping = {};
+        const mapping = {};
         subsidiaries.forEach((sub) => {
-          const key = "ID";
           const row = data.find(
             (r) =>
-              (r[key] || "").toLowerCase().trim() ===
+              (r.ID || "").toLowerCase().trim() ===
               sub.id.toString().toLowerCase().trim()
           );
-          if (row) {
-            const quarters = ["Q1", "Q2", "Q3", "Q4"];
-            if (selectedYear === "2024") {
-              const baseline = parseFloat(row["2023 Lookback Savings"]);
-              const trace2023 = {
-                x: quarters,
-                y: quarters.map(() => baseline),
-                mode: "lines+markers",
-                marker: { color: "gray", size: 8 },
-                line: { color: "gray" },
-                name: "2023",
-              };
-              const trace2024 = {
-                x: quarters,
-                y: quarters.map((q) => parseFloat(row[q])),
-                mode: "lines+markers",
-                marker: { color: "#6c5ce7", size: 8 },
-                line: { color: "#6c5ce7" },
-                name: "2024",
-                error_y: {
-                  type: "data",
-                  array: quarters.map((q) => parseFloat(row[`${q} CI`])),
-                  visible: true,
-                },
-              };
-              newMapping[sub.id] = [trace2023, trace2024];
-            } else {
-              const quarters = ["Q1", "Q2", "Q3", "Q4"];
-              const baseline = parseFloat(row["2024 Lookback Savings"]);
-              const trace2024 = {
-                x: quarters,
-                y: quarters.map(() => baseline),
-                mode: "lines+markers",
-                marker: { color: "gray", size: 8 },
-                line: { color: "gray" },
-                name: "2024",
-              };
-              const trace2025 = {
-                x: quarters,
-                y: quarters.map((q) =>
-                  q === "Q1" || q === "Q2" ? parseFloat(row[q]) : null
-                ),
-                mode: "lines+markers",
-                marker: { color: "#6c5ce7", size: 8 },
-                line: { color: "#6c5ce7" },
-                name: "2025",
-                error_y: {
-                  type: "data",
-                  array: quarters.map((q) =>
-                    q === "Q1" || q === "Q2" ? parseFloat(row[`${q} CI`]) : null
-                  ),
-                  visible: true,
-                },
-              };
-              newMapping[sub.id] = [trace2024, trace2025];
-            }
+          if (!row) return;
+          const quarters = ["Q1", "Q2", "Q3", "Q4"];
+          if (selectedYear === "2024") {
+            const base = parseFloat(row["2023 Lookback Savings"]);
+            mapping[sub.id] = [
+              { x: quarters, y: quarters.map(() => base), mode: "lines+markers", marker: { color: "gray", size: 8 }, line: { color: "gray" }, name: "2023" },
+              { x: quarters, y: quarters.map((q) => parseFloat(row[q])), mode: "lines+markers", marker: { color: "#6c5ce7", size: 8 }, line: { color: "#6c5ce7" }, name: "2024", error_y: { type: "data", array: quarters.map((q) => parseFloat(row[`${q} CI`])), visible: true } },
+            ];
+          } else {
+            const base = parseFloat(row["2024 Lookback Savings"]);
+            mapping[sub.id] = [
+              { x: quarters, y: quarters.map(() => base), mode: "lines+markers", marker: { color: "gray", size: 8 }, line: { color: "gray" }, name: "2024" },
+              { x: quarters, y: quarters.map((q) => (q === "Q1" || q === "Q2" ? parseFloat(row[q]) : null)), mode: "lines+markers", marker: { color: "#6c5ce7", size: 8 }, line: { color: "#6c5ce7" }, name: "2025", error_y: { type: "data", array: quarters.map((q) => (q === "Q1" || q === "Q2" ? parseFloat(row[`${q} CI`]) : null)), visible: true } },
+            ];
           }
         });
-        setSubsidiarySharedSavings(newMapping);
+        setSubsidiarySharedSavings(mapping);
       },
     });
   }, [subsidiaries, selectedYear]);
 
-  // Load clinician counts (for 2025) or physician counts (for 2024).
   useEffect(() => {
     if (subsidiaries.length === 0) return;
     if (selectedYear === "2024") {
@@ -310,16 +235,16 @@ export default function AccountDetail() {
         header: true,
         complete: (results) => {
           const data = results.data;
-          const newCountMapping = {};
+          const counts = {};
           subsidiaries.forEach((sub) => {
             const row = data.find(
               (r) =>
-                (r["ID"] || "").toLowerCase().trim() ===
+                (r.ID || "").toLowerCase().trim() ===
                 sub.id.toString().toLowerCase().trim()
             );
-            newCountMapping[sub.id] = row ? parseInt(row["physicians"], 10) : 0;
+            counts[sub.id] = row ? parseInt(row.physicians, 10) : 0;
           });
-          setSubsidiaryClinicianCount(newCountMapping);
+          setSubsidiaryClinicianCount(counts);
         },
       });
     } else {
@@ -328,11 +253,11 @@ export default function AccountDetail() {
         header: true,
         complete: (results) => {
           const data = results.data;
-          const newCountMapping = {};
+          const counts = {};
           subsidiaries.forEach((sub) => {
-            const count = data.filter((r) => {
-              const lat = parseFloat((r.Latitude || "").toString().trim());
-              const lon = parseFloat((r.Longitude || "").toString().trim());
+            counts[sub.id] = data.filter((r) => {
+              const lat = parseFloat(r.Latitude || "");
+              const lon = parseFloat(r.Longitude || "");
               return (
                 (r["Entity ID"] || "").toLowerCase().trim() ===
                   sub.id.toString().toLowerCase().trim() &&
@@ -344,15 +269,13 @@ export default function AccountDetail() {
                 lon <= 180
               );
             }).length;
-            newCountMapping[sub.id] = count;
           });
-          setSubsidiaryClinicianCount(newCountMapping);
+          setSubsidiaryClinicianCount(counts);
         },
       });
     }
   }, [subsidiaries, selectedYear]);
 
-  // Layout for the shared savings chart.
   const sharedSavingsLayout = {
     title: "Projected % (2024 & 2025)",
     xaxis: { title: { text: "Quarter (Data Released)" }, showgrid: false },
@@ -369,7 +292,6 @@ export default function AccountDetail() {
 
   return (
     <Box sx={{ width: "100%", minHeight: "100vh", px: { xs: 2, sm: 3, md: 4 }, py: 3 }}>
-      {/* Back Button */}
       <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
         <IconButton sx={{ mr: 1 }} onClick={() => navigate("/accounts")}>
           <ArrowBackIcon />
@@ -378,12 +300,10 @@ export default function AccountDetail() {
           {parentName}
         </Typography>
       </Box>
-
-      {/* Stats */}
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3, mb: 4 }}>
-        {accountStats.map((stat, index) => (
-          <Box key={index} sx={{ flex: "1 1 0px", minWidth: 250 }}>
-            <Card sx={{ height: "100%" }}>
+        {accountStats.map((stat, idx) => (
+          <Box key={idx} sx={{ flex: "1 1 0px", minWidth: 250 }}>
+            <Card>
               <CardContent sx={{ display: "flex", alignItems: "center" }}>
                 <Avatar sx={{ bgcolor: "#6c5ce7", mr: 2 }}>{stat.icon}</Avatar>
                 <Box>
@@ -399,8 +319,6 @@ export default function AccountDetail() {
           </Box>
         ))}
       </Box>
-
-      {/* Year Toggle - Render buttons only for available years */}
       <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 2 }}>
         <Typography variant="h6" fontWeight="bold">
           {selectedYear} ACOs
@@ -422,8 +340,6 @@ export default function AccountDetail() {
           </Button>
         )}
       </Box>
-
-      {/* Table */}
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -457,7 +373,6 @@ export default function AccountDetail() {
                   <TableCell>
                     <Box sx={{ display: "inline-flex", alignItems: "center" }}>
                       {aco.projectedSavings || "N/A"}
-                      {/*<KeyboardDoubleArrowUpIcon sx={{ ml: 0.5, color: "green" }} />*/}
                     </Box>
                   </TableCell>
                   <TableCell>
@@ -469,7 +384,6 @@ export default function AccountDetail() {
                     </Box>
                   </TableCell>
                   <TableCell align="right">
-                    {/* UPDATED: Append the selectedYear into the report URL */}
                     <Button
                       variant="contained"
                       size="small"
@@ -483,14 +397,11 @@ export default function AccountDetail() {
                     </Button>
                   </TableCell>
                 </TableRow>
-
-                {/* Expandable Content */}
                 <TableRow>
                   <TableCell colSpan={5} sx={{ p: 0, border: 0 }}>
                     <Collapse in={expandedRow === aco.id} timeout="auto" unmountOnExit>
                       <Box sx={{ p: 2, backgroundColor: "#f9f9f9" }}>
                         <Box sx={{ display: "flex", gap: 3 }}>
-                          {/* Shared Savings Chart */}
                           {subsidiarySharedSavings[aco.id] &&
                             parseFloat(subsidiarySharedSavings[aco.id][0].y[0]) > 0 && (
                               <Box sx={{ flex: 2 }}>
@@ -509,8 +420,15 @@ export default function AccountDetail() {
                                 </Paper>
                               </Box>
                             )}
-                          {/* Right Side Cards: Stop Loss & Physicians */}
-                          <Box sx={{ flex: 1, display: "flex", flexDirection: "column", height: 300, gap: 2 }}>
+                          <Box
+                            sx={{
+                              flex: 1,
+                              display: "flex",
+                              flexDirection: "column",
+                              height: 300,
+                              gap: 2,
+                            }}
+                          >
                             <Card sx={{ flex: 1 }}>
                               <CardContent
                                 sx={{
