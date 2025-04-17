@@ -272,7 +272,7 @@ const Dashboard = () => {
       {/* Horizontal Bar Chart using Plotly */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h6" component="h2" fontWeight="bold" sx={{ mb: 2 }}>
-          Gross Savings by ACO reported Q2 2025
+          Savings by ACO reported Q2 2025
         </Typography>
         {mergedData.length > 0 && (
           <Plot

@@ -164,11 +164,11 @@ const Footer = () => {
             Risk Score and Forecasting Disclaimer: The risk score provided by the Sparx platform is an
   actuarial-based projection intended to estimate the likelihood that an Accountable Care Organization (ACO)
   will achieve shared savings. This score is derived using historical Medicare FFS Claims Data, publicly
-  available benchmark reports, financial statements, and proprietary actuarial models. However,
-  these projections are forward-looking estimates that are subject to numerous factors beyond Sparx's
-  control, including but not limited to: Changes in regulatory frameworks and Medicare reimbursement
-  policies., Variability in provider network performance and turnover., Economic and market conditions that
-  affect healthcare costs. Data inaccuracies or delays in financial reporting.<br/><br/>
+  available benchmark reports, financial statements, and proprietary actuarial models. However, these projections are
+  forward-looking estimates that are subject to numerous factors beyond Sparx’s control, including but not limited to:
+  Changes in regulatory frameworks and Medicare reimbursement policies; Variability in provider network performance and
+  turnover; Economic and market conditions that affect healthcare costs; Data inaccuracies or delays in financial
+  reporting.<br/><br/>
 
   No Guarantee of Accuracy: Sparx makes no guarantee, representation, or warranty that the
   risk score, savings probability, or any related forecast will accurately predict future financial or
@@ -211,11 +211,11 @@ const Footer = () => {
   or legal consequences resulting from reliance on platform outputs. This disclaimer is incorporated by
   reference into Sparx's Terms of Service. If you do not agree to these terms, you should discontinue use
   of the platform immediately. For questions or concerns, please contact{' '}<MuiLink
-  href="mailto:legal@usersparx.com"
+  href="mailto:legal@usesparx.com"
   underline="hover"
   sx={{ color: 'inherit', fontWeight: 500 }}
             >
-              <strong>legal@usersparx.com</strong>
+              <strong>legal@usesparx.com</strong>
             </MuiLink>
           </Typography>
         </Grid2>
