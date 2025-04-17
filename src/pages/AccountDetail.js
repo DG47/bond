@@ -26,7 +26,6 @@ import {
   Shield,
   MedicalServices,
 } from "@mui/icons-material";
-import KeyboardDoubleArrowUpIcon from "@mui/icons-material/KeyboardDoubleArrowUp";
 import { useNavigate, useParams } from "react-router-dom";
 import Papa from "papaparse";
 import Plot from "react-plotly.js";
