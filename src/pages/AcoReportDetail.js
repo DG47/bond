@@ -159,6 +159,10 @@ const AcoReportDetail = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+  console.log("🚩 ACO ID param:", id);
+  parseCsv(SHARED_SAVINGS_URL).then(rows => {
+    console.log("🚩 Shared Savings sample IDs:", rows.slice(0,5).map(r=>r.ID));
+  });
 
   // Component state.
   const [acoName, setAcoName] = useState("");
@@ -225,6 +229,18 @@ const AcoReportDetail = () => {
       heightLeft -= pageHeight;
     }
     pdf.save(`Sparx - ${acoName}.pdf`);
+  };
+
+   const handleDownloadQBR = () => {
+    handleMenuClose();
+    const fileName = "REACH.D0048.BNMR.PY2024.D250213.T1000540 (1) (3).xlsx";
+    const url = `/data/${encodeURIComponent(fileName)}`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   // Note: The Download QBR function and corresponding menu item have been removed.
@@ -545,16 +561,16 @@ const AcoReportDetail = () => {
           acoId = row["ACO_ID"]?.toString().trim();
           name = row["ACO_Name"];
         } else if (program === "KCC") {
-          eligible = parseOneDecimal(row["Beneficiary Months (CKD & ESRD)"]);
+          eligible = parseOneDecimal(row["Beneficiary_Months"]);
           const costKey =
-            row["Performance Year Expenditure\n (CKD & ESRD)"] !== undefined
+            row["Performance_Year_Expenditure"] !== undefined
               ? "Performance Year Expenditure\n (CKD & ESRD)"
               : "Performance Year Expenditure (CKD & ESRD)";
           cost = parseTwoDecimal(row[costKey]);
           quality = parseOneDecimal(row["Total Quality Score"]);
-          risk = row["Agreement Option"]?.trim();
-          acoId = row["Entity Legal Business Name"]?.trim();
-          name = row["Entity Legal Business Name"];
+          risk = row["Agreement_Option"]?.trim();
+          acoId = row["Entity_Legal_Business_Name"]?.trim();
+          name = row["Entity_Legal_Business_Name"];
         }
         return {
           acoId,
@@ -816,7 +832,7 @@ const AcoReportDetail = () => {
     title: "Projected % (2024 & 2025)",
     xaxis: { title: { text: "Quarter (Data Released)" }, showgrid: false },
     yaxis: {
-      title: { text: "Gross Percentage Savings" },
+      title: { text: "Shared Savings Percentage" },
       showgrid: true,
       rangemode: "tozero",
       ticksuffix: "%",
@@ -853,6 +869,9 @@ const AcoReportDetail = () => {
         <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={handleMenuClose}>
           <MenuItem onClick={handleDownloadPDF}>Download Analysis</MenuItem>
           <MenuItem onClick={handleDownloadFinancialZip}>Download Financials</MenuItem>
+          {id === "D0048" && (
+            <MenuItem onClick={handleDownloadQBR}>Download QBR</MenuItem>
+          )}
         </Menu>
         <Button
           variant="contained"
@@ -886,18 +905,20 @@ const AcoReportDetail = () => {
       </Box>
 
       {/* Shared Savings Chart */}
-      <Box sx={{ mb: 5 }}>
-        <Typography variant="h6" fontWeight="bold" gutterBottom>Shared Savings</Typography>
-        <Paper elevation={3} sx={{ p: 2 }}>
-          <Plot
-            data={confidenceData.length > 0 ? confidenceData : confidenceDataStatic}
-            layout={confidenceLayout}
-            config={{ scrollZoom: false }}
-            useResizeHandler
-            style={{ width: "100%", height: "300px" }}
-          />
-        </Paper>
-      </Box>
+      {/* Shared Savings Chart */}
+<Box sx={{ mb: 5 }}>
+  <Typography variant="h6" fontWeight="bold" gutterBottom>
+    Shared Savings
+  </Typography>
+  <Paper elevation={3} sx={{ p: 2 }}>
+    <Plot
+      data={confidenceData.length > 0 ? confidenceData : confidenceDataStatic}
+      layout={confidenceLayout}
+      config={{ scrollZoom: false }}
+      style={{ width: "100%", height: "300px" }}
+    />
+  </Paper>
+</Box>
 
       {/* Projected Benchmark v/s Expenditure Graph */}
       {benchmarkPlot && (

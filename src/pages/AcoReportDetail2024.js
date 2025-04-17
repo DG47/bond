@@ -38,7 +38,7 @@ const defaultMetrics = {
 // Data file URLs for 2024
 const DATA_2024_URL = "/data/2024_data.csv";
 const NPI_OUTPUT_24_URL = "/data/npi_output24.csv";
-const STOPLOSS_URL = "/data/StoplossSumarry.csv";
+const ACO_SUBSIDIARY_URL = "/data/ACO_subsidiary list.csv";
 
 const ENROLL_URL = "/data/MEXPR - DATA_ENROLL.xlsx";
 const CLAIMS_URL = "/data/MEXPR - DATA_CLAIMS.xlsx";
@@ -231,6 +231,12 @@ const AcoReportDetail2024 = () => {
   const [acoName, setAcoName] = useState("");
   const [clinicianCount, setClinicianCount] = useState(0);
   const [selectedQuarter, setSelectedQuarter] = useState("Q2");
+  // ── New graph state for 4 additional plots ─────────────────────────
+  const [quarterlyPmpmPlot, setQuarterlyPmpmPlot] = useState(null);
+  const [quarterlyPercentagePlot, setQuarterlyPercentagePlot] = useState(null);
+  const [pmpmPlot, setPmpmPlot] = useState(null);
+  const [qualityPlot, setQualityPlot] = useState(null);
+// ──────────────────────────────────────────────────────────────────────
 
   const [bondedAmount, setBondedAmount] = useState(defaultMetrics.bondedAmount);
   const [membership, setMembership] = useState(defaultMetrics.membership);
@@ -241,11 +247,11 @@ const AcoReportDetail2024 = () => {
   // Graph states.
   const [benchmarkPlot, setBenchmarkPlot] = useState(null);
   const [qbrPlot, setQbrPlot] = useState(null);
-  const [pmpmPlot, setPmpmPlot] = useState(null);
-  const [qualityPlot, setQualityPlot] = useState(null);
+  // const [pmpmPlot, setPmpmPlot] = useState(null);
+  // const [qualityPlot, setQualityPlot] = useState(null);
   const [stoplossData, setStoplossData] = useState([]);
-  const [quarterlyPmpmPlot, setQuarterlyPmpmPlot] = useState(null);
-  const [quarterlyPercentagePlot, setQuarterlyPercentagePlot] = useState(null);
+  // const [quarterlyPmpmPlot, setQuarterlyPmpmPlot] = useState(null);
+  // const [quarterlyPercentagePlot, setQuarterlyPercentagePlot] = useState(null);
   const [providerMapPlot, setProviderMapPlot] = useState(null);
   const [physicianBreakdown, setPhysicianBreakdown] = useState({});
   const [confidenceData, setConfidenceData] = useState([]);
@@ -467,6 +473,100 @@ const AcoReportDetail2024 = () => {
       console.error("Error in loadQBRVsSparxData:", error);
     }
   };
+  // ── New: load industry scatter & percentile charts ───────────────────
+const loadIndustryResults = useCallback(async () => {
+  // Load the three PUF CSVs in parallel
+  const [reachData, msspData, kccData] = await Promise.all([
+    parseCsv("/data/REACH_PUF2023.csv"),
+    parseCsv("/data/MSSP_PUF2023.csv"),
+    parseCsv("/data/KCC_PUF2023.csv"),
+  ]);
+
+  // Your existing processRow logic
+  const processRow = (row, program) => {
+    let eligible, cost, quality, risk, acoId, name;
+    if (program === "REACH") {
+      eligible = parseOneDecimal(row["Total Eligible Months8"]);
+      cost     = parseTwoDecimal(row["Total Cost of Care12"]);
+      quality  = parseOneDecimal(row["Total Quality Score13"]);
+      risk     = row["Risk\nArrangement2"];
+      acoId    = row["ACO\nID"]?.trim();
+      name     = row["ACO Name"];
+    } else if (program === "MSSP") {
+      const raw = parseOneDecimal(row["N_AB"]);
+      eligible = raw ? raw * 12 : 0;
+      cost     = parseTwoDecimal(row["ABtotExp"]) || parseOneDecimal(row["Expenditures"]);
+      quality  = parseOneDecimal(row["QualScore"]);
+      risk     = row["Current_Track"];
+      acoId    = row["ACO_ID"]?.toString().trim();
+      name     = row["ACO_Name"];
+    } else {
+      // KCC
+      eligible = parseOneDecimal(row["Beneficiary Months (CKD & ESRD)"]);
+      const key =
+        row["Performance Year Expenditure\n (CKD & ESRD)"] !== undefined
+          ? "Performance Year Expenditure\n (CKD & ESRD)"
+          : "Performance Year Expenditure (CKD & ESRD)";
+      cost     = parseTwoDecimal(row[key]);
+      quality  = parseOneDecimal(row["Total Quality Score"]);
+      risk     = row["Agreement Option"]?.trim();
+      acoId    = row["Entity Legal Business Name"]?.trim();
+      name     = row["Entity Legal Business Name"];
+    }
+    return {
+      acoId:    acoId?.toLowerCase().trim(),
+      program,
+      risk,
+      eligible,
+      pmpm:     eligible && cost ? parseFloat((cost / eligible).toFixed(1)) : 0,
+      quality,
+      name
+    };
+  };
+
+  // Merge and filter
+  const combined = [
+    ...reachData.map(r => processRow(r, "REACH")),
+    ...msspData.map(r => processRow(r, "MSSP")),
+    ...kccData.map(r => processRow(r, "KCC")),
+  ].filter(d => d && d.acoId);
+
+  // Find our ACO
+  const lowerId = id.toLowerCase().trim();
+  const current = combined.find(a => a.acoId === lowerId);
+  if (!current) return;
+
+  // Scatter: Member‑Months vs PMPM
+  const sameGroup = combined.filter(
+    a => a.program === current.program && a.risk === current.risk
+  );
+  setPmpmPlot({
+    x: sameGroup.map(a => a.eligible),
+    y: sameGroup.map(a => a.pmpm),
+    text: sameGroup.map(a => a.acoId === lowerId ? a.name : ""),
+    mode: "markers",
+    type: "scatter",
+    marker: {
+      size: sameGroup.map(a => a.acoId === lowerId ? 20 : 10),
+      color: sameGroup.map(a => a.acoId === lowerId ? "#6c5ce7" : "#e7c56c"),
+    },
+  });
+
+  // Line+markers: Percentile Rank of Quality
+  const sorted = [...sameGroup].sort((a,b) => a.quality - b.quality);
+  setQualityPlot({
+    x: sorted.map((_, i) => ((i + 1) / sorted.length) * 100),
+    y: sorted.map(a => a.quality),
+    text: sorted.map(a => a.acoId === lowerId ? a.name : ""),
+    mode: "markers+lines",
+    type: "scatter",
+    marker: {
+      size: sorted.map(a => a.acoId === lowerId ? 16 : 8),
+      color: sorted.map(a => a.acoId === lowerId ? "#6c5ce7" : "#e7c56c"),
+    },
+  });
+}, [id]);
+// ─────────────────────────────────────────────────────────────────────
 
   const loadSharedSavingsData = async () => {
     try {
@@ -510,8 +610,8 @@ const AcoReportDetail2024 = () => {
   // Load Monthly Graphs: "Monthly Paid PMPM by Claim Type" and "Monthly Expense Distribution (%)"
   const loadClaimsAndEnrollData = async (currentAcoName) => {
     const lowerId = id.toLowerCase().trim();
-    const enrollData = await parseCsv(DATA_2024_URL);
-    const claimsData = await parseCsv(DATA_2024_URL);
+    const enrollData = await parseExcelBySheet(ENROLL_URL, id);
+    const claimsData = await parseExcelBySheet(CLAIMS_URL, id);
     const enrollByQuarter = {};
     enrollData.forEach((row) => {
       if (row.PERF_YR && row.PERF_YR.toString().trim() === "2024") {
@@ -617,22 +717,34 @@ const AcoReportDetail2024 = () => {
     }));
     // ---- Monthly Paid PMPM by Claim Type ----
     setQuarterlyPmpmPlot({
-      data: pmpmTraces,
+        data: categories.map((cat,i) => ({
+        x: monthLabels,
+        y: pmpmData[cat],
+        name: cat,
+        type: "bar",
+        marker: { color: pastelColors[i] },
+      })),
       layout: {
         barmode: "stack",
         title: `${currentAcoName} - 2024 Monthly Paid PMPM`,
-        xaxis: { title: { text: "Month" } },
-        yaxis: { title: { text: "PMPM" }, tickprefix: "$" },
+        xaxis: { title: "Month" },
+        yaxis: { title: "PMPM", tickprefix: "$" },
       },
     });
-    // ---- Monthly Expense Distribution (%) ----
     setQuarterlyPercentagePlot({
-      data: percentageTraces,
+      data: categories.map((cat,i) => ({
+        x: monthLabels,
+        y: percentageData[cat],
+        name: cat,
+        type: "bar",
+        marker: { color: pastelColors[i] },
+        ticksuffix: "%",
+      })),
       layout: {
         barmode: "stack",
         title: `${currentAcoName} - 2024 Monthly Expense Distribution (%)`,
-        xaxis: { title: { text: "Month" } },
-        yaxis: { title: { text: "Percent of total" }, ticksuffix: "%" },
+        xaxis: { title: "Month" },
+        yaxis: { title: "Percent of total", ticksuffix: "%" },
       },
     });
   };
@@ -645,52 +757,52 @@ const AcoReportDetail2024 = () => {
         parseCsv("/data/MSSP_PUF2023.csv"),
         parseCsv("/data/KCC_PUF2023.csv"),
       ]);
-      const processRow = (row, program) => {
-        let eligible, cost, quality, risk, acoId, name;
-        if (program === "REACH") {
-          eligible = parseOneDecimal(row["Total Eligible Months8"]);
-          cost = parseTwoDecimal(row["Total Cost of Care12"]);
-          quality = parseOneDecimal(row["Total Quality Score13"]);
-          risk = row["Risk\nArrangement2"];
-          acoId = row["ACO\nID"]?.trim();
-          name = row["ACO Name"];
-        } else if (program === "MSSP") {
-          const rawEligible = parseOneDecimal(row["N_AB"]);
-          const eligibleVal = rawEligible ? rawEligible * 12 : 0;
-          eligible = parseFloat(eligibleVal.toFixed(1));
-          cost = parseTwoDecimal(row["ABtotExp"]) || parseOneDecimal(row["Expenditures"]);
-          quality = parseOneDecimal(row["QualScore"]);
-          risk = row["Current_Track"];
-          acoId = row["ACO_ID"]?.toString().trim();
-          name = row["ACO_Name"];
-        } else if (program === "KCC") {
-          eligible = parseOneDecimal(row["Beneficiary Months (CKD & ESRD)"]);
-          const costKey =
-            row["Performance Year Expenditure\n (CKD & ESRD)"] !== undefined
-              ? "Performance Year Expenditure\n (CKD & ESRD)"
-              : "Performance Year Expenditure (CKD & ESRD)";
-          cost = parseTwoDecimal(row[costKey]);
-          quality = parseOneDecimal(row["Total Quality Score"]);
-          risk = row["Agreement Option"]?.trim();
-          acoId = row["Entity Legal Business Name"]?.trim();
-          name = row["Entity Legal Business Name"];
-        }
-        return {
-          acoId,
-          name,
-          program,
-          risk,
-          eligible,
-          cost,
-          quality,
-          pmpm: eligible && cost ? parseFloat((cost / eligible).toFixed(1)) : null,
-        };
-      };
-      const combined = [
-        ...reach.map((r) => processRow(r, "REACH")),
-        ...mssp.map((r) => processRow(r, "MSSP")),
-        ...kcc.map((r) => processRow(r, "KCC")),
-      ].filter((d) => d.acoId && d.pmpm != null && d.quality != null);
+        // ── begin defining combined ─────────────────────────────────────────
+  const processRow = (row, program) => {
+    let eligible, cost, quality, risk, acoId, name;
+    if (program === "REACH") {
+      eligible = parseOneDecimal(row["Total Eligible Months8"]);
+      cost     = parseTwoDecimal(row["Total Cost of Care12"]);
+      quality  = parseOneDecimal(row["Total Quality Score13"]);
+      risk     = row["Risk\nArrangement2"];
+      acoId    = row["ACO\nID"]?.trim();
+      name     = row["ACO Name"];
+    } else if (program === "MSSP") {
+      const raw = parseOneDecimal(row["N_AB"]);
+      eligible = raw ? raw * 12 : 0;
+      cost     = parseTwoDecimal(row["ABtotExp"]) || parseOneDecimal(row["Expenditures"]);
+      quality  = parseOneDecimal(row["QualScore"]);
+      risk     = row["Current_Track"];
+      acoId    = row["ACO_ID"]?.toString().trim();
+      name     = row["ACO_Name"];
+    } else {
+      eligible = parseOneDecimal(row["Beneficiary Months (CKD & ESRD)"]);
+      const key = row["Performance Year Expenditure\n (CKD & ESRD)"] !== undefined
+        ? "Performance Year Expenditure\n (CKD & ESRD)"
+        : "Performance Year Expenditure (CKD & ESRD)";
+      cost     = parseTwoDecimal(row[key]);
+      quality  = parseOneDecimal(row["Total Quality Score"]);
+      risk     = row["Agreement Option"]?.trim();
+      acoId    = row["Entity Legal Business Name"]?.trim();
+      name     = row["Entity Legal Business Name"];
+    }
+    return {
+      acoId:    acoId?.toLowerCase().trim(),
+      program,
+      risk,
+      eligible,
+      pmpm:     eligible && cost ? parseFloat((cost/eligible).toFixed(1)) : 0,
+      quality,
+      name
+    };
+  };
+
+  const combined = [
+    ...reach.map(r => processRow(r, "REACH")),
+    ...mssp.map(r => processRow(r, "MSSP")),
+    ...kcc.map(r => processRow(r, "KCC")),
+  ].filter(d => d.acoId);
+  // ── end defining combined ────────────────────────────────────────────
       const current = combined.find(
         (a) => (a.acoId || "").toLowerCase() === id.toLowerCase().trim()
       );
@@ -700,9 +812,34 @@ const AcoReportDetail2024 = () => {
     };
 
     const loadStoplossData = async () => {
-      const rows = await parseCsv(STOPLOSS_URL);
-      setStoplossData(rows);
-    };
+  // 1) read the subsidiary CSV
+  const subs = await parseCsv(ACO_SUBSIDIARY_URL);
+
+  // 2) find our ACO’s row
+  const row = subs.find(
+    (r) => (r.ACO_ID || "").toString().toLowerCase().trim() === id.toLowerCase().trim()
+  );
+  if (!row) {
+    console.warn(`No subsidiary row for ACO ${id}`);
+    return;
+  }
+
+  // 3) pull the stop_loss column (adjust if your header is different)
+  // Try common variants:
+  const raw = row.stop_loss ?? row["stop_loss_2024"] ?? row["stop_loss_2023"] ?? row.stopLoss;
+  if (raw == null) {
+    console.warn("Couldn't find a stop_loss field in subsidiary CSV for ACO", id);
+    return;
+  }
+
+  // 4) parse and format
+  const num = parseFloat(String(raw).replace(/[$,]/g, ""));
+  if (!isNaN(num)) {
+    setStopLoss(`$${num.toLocaleString()}`);
+  } else {
+    console.warn("Parsed stop_loss was NaN for ACO", id, raw);
+  }
+};
 
     const loadProviderData = async () => {
       await loadProviderMapData(id, setClinicianCount, setProviderMapPlot, setPhysicianBreakdown);
@@ -734,7 +871,7 @@ const AcoReportDetail2024 = () => {
     title: "Projected % (2024)",
     xaxis: { title: { text: "Quarter (Data Released)" }, showgrid: false },
     yaxis: {
-      title: { text: "Gross Percentage Savings" },
+      title: { text: "Shared Saving Percentage" },
       showgrid: true,
       rangemode: "tozero",
       ticksuffix: "%",
@@ -858,38 +995,28 @@ const AcoReportDetail2024 = () => {
 
       {/* Monthly Paid PMPM by Claim Type */}
       {quarterlyPmpmPlot && (
-        <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Monthly Paid PMPM by Claim Type
-          </Typography>
-          <Paper elevation={3} sx={{ p: 2 }}>
-            <Plot
-              data={quarterlyPmpmPlot.data}
-              layout={quarterlyPmpmPlot.layout}
-              config={{ scrollZoom: false }}
-              useResizeHandler
-              style={{ width: "100%", height: "100%" }}
-            />
-          </Paper>
-        </Box>
+        <Paper sx={{ mb:5, p:2 }}>
+          <Typography variant="h6">Monthly Paid PMPM by Claim Type</Typography>
+          <Plot
+            data={quarterlyPmpmPlot.data}
+            layout={quarterlyPmpmPlot.layout}
+            useResizeHandler
+            style={{ width:"100%", height:300 }}
+          />
+        </Paper>
       )}
 
       {/* Monthly Expense Distribution (%) */}
       {quarterlyPercentagePlot && (
-        <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Monthly Expense Distribution (%)
-          </Typography>
-          <Paper elevation={3} sx={{ p: 2 }}>
-            <Plot
-              data={quarterlyPercentagePlot.data}
-              layout={quarterlyPercentagePlot.layout}
-              config={{ scrollZoom: false }}
-              useResizeHandler
-              style={{ width: "100%", height: "100%" }}
-            />
-          </Paper>
-        </Box>
+        <Paper sx={{ mb:5, p:2 }}>
+          <Typography variant="h6">Monthly Expense Distribution (%)</Typography>
+          <Plot
+            data={quarterlyPercentagePlot.data}
+            layout={quarterlyPercentagePlot.layout}
+            useResizeHandler
+            style={{ width:"100%", height:300 }}
+          />
+        </Paper>
       )}
 
 
@@ -1032,48 +1159,34 @@ const AcoReportDetail2024 = () => {
 
       {/* Latest Industry Results - Member Months vs PMPM */}
       {pmpmPlot && (
-        <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Latest Industry Results - Member Months vs PMPM
-          </Typography>
-          <Paper elevation={3} sx={{ p: 2 }}>
-            <Plot
-              data={[pmpmPlot]}
-              layout={{
-                autosize: true,
-                xaxis: { title: { text: "Total Member Months" } },
-                yaxis: { title: { text: "PMPM Cost" }, tickprefix: "$" },
-                hovermode: "closest",
-              }}
-              config={{ scrollZoom: false }}
-              useResizeHandler
-              style={{ width: "100%", height: "100%" }}
-            />
-          </Paper>
-        </Box>
+        <Paper sx={{ mb:5, p:2 }}>
+          <Typography variant="h6">Latest Industry Results - Member Months vs PMPM</Typography>
+          <Plot
+            data={[pmpmPlot]}
+            layout={{
+              xaxis: { title:"Total Member Months" },
+              yaxis: { title:"PMPM Cost", tickprefix:"$" },
+            }}
+            useResizeHandler
+            style={{ width:"100%", height:300 }}
+          />
+        </Paper>
       )}
 
       {/* Latest Industry Results - Percentile Rank of Quality Scores */}
       {qualityPlot && (
-        <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Latest Industry Results - Percentile Rank of Quality Scores
-          </Typography>
-          <Paper elevation={3} sx={{ p: 2 }}>
-            <Plot
-              data={[qualityPlot]}
-              layout={{
-                autosize: true,
-                xaxis: { title: { text: "Percentile Rank" }, ticksuffix: "%" },
-                yaxis: { title: { text: "Total Quality Score" }, ticksuffix: "%" },
-                hovermode: "closest",
-              }}
-              config={{ scrollZoom: false }}
-              useResizeHandler
-              style={{ width: "100%", height: "100%" }}
-            />
-          </Paper>
-        </Box>
+        <Paper sx={{ mb:5, p:2 }}>
+          <Typography variant="h6">Latest Industry Results - Percentile Rank of Quality Scores</Typography>
+          <Plot
+            data={[qualityPlot]}
+            layout={{
+              xaxis: { title:"Percentile Rank", ticksuffix:"%" },
+              yaxis: { title:"Total Quality Score", ticksuffix:"%" },
+            }}
+            useResizeHandler
+            style={{ width:"100%", height:300 }}
+          />
+        </Paper>
       )}
     </Box>
   );
