@@ -50,6 +50,7 @@ const NPI_OUTPUT_URL = "/data/npi_output.csv";
 const SHARED_SAVINGS_URL = "/data/shared_savings.csv";
 const ACO_SUBSIDIARY_URL = "/data/ACO_subsidiary list.csv"; // CSV used for matching
 
+
 // NEW: Mapping object for financial zip files.
 // Map the CSV parent_co values to the exact ZIP filenames.
 const financialMapping = {
@@ -596,8 +597,16 @@ const AcoReportDetail = () => {
       if (!current) return;
       setAcoName(current.name + " (2025 Q2)");
 
-      const sameGroup = combined.filter(
-        (a) => a.program === current.program && a.risk === current.risk
+      // const sameGroup = combined.filter(
+      //   (a) => a.program === current.program && a.risk === current.risk
+      // );
+      const sameGroup =
+  current.program === "KCC"
+    ? combined.filter(a => a.program === "KCC")
+    : combined.filter(
+        a =>
+          a.program === current.program &&
+          a.risk === current.risk
       );
       const lowerId = id.toLowerCase().trim();
       const markerSizesPmpm = sameGroup.map((a) =>

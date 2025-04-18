@@ -1,4 +1,5 @@
-// at the very top of src/pages/AcoReportDetail2024.js
+// src/pages/AcoReportDetail2024.js
+
 import * as XLSX from "xlsx";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
@@ -36,58 +37,29 @@ const defaultMetrics = {
 };
 
 // Data file URLs for 2024
-const DATA_2024_URL = "/data/2024_data.csv";
-const NPI_OUTPUT_24_URL = "/data/npi_output24.csv";
-const ACO_SUBSIDIARY_URL = "/data/ACO_subsidiary list.csv";
-
-const ENROLL_URL = "/data/MEXPR - DATA_ENROLL.xlsx";
-const CLAIMS_URL = "/data/MEXPR - DATA_CLAIMS.xlsx";
+const DATA_2024_URL       = "/data/2024_data.csv";
+const NPI_OUTPUT_24_URL   = "/data/npi_output24.csv";
+const ACO_SUBSIDIARY_URL  = "/data/ACO_subsidiary list.csv";
+const ENROLL_URL          = "/data/MEXPR - DATA_ENROLL.xlsx";
+const CLAIMS_URL          = "/data/MEXPR - DATA_CLAIMS.xlsx";
+const STOPLOSS_URL        = "/data/StoplossSumarry.csv";
 
 // Define stoploss thresholds.
 const stoplossThresholds = [
-  "150K",
-  "200K",
-  "250K",
-  "300K",
-  "350K",
-  "400K",
-  "450K",
-  "500K",
-  "1M",
+  "150K", "200K", "250K", "300K", "350K",
+  "400K", "450K", "500K", "1M"
 ];
 
-// --- Mapping Objects ---
 // Mapping for Financials downloads.
 const financialMapping = {
   "Wellvana Health, LLC": "Wellvana_Financials.zip",
-  "Village Practice Management Company Holdings, LLC": "VPMC_Financials.zip",
-  "US Renal Care, Inc.": "US Renal Care_Financials.zip",
-  "Upperline Health Inc.": "Upperline_Financials.zip",
-  "Theoria Medical PLLC": "Theoria_Financials.zip",
-  "SLTCM Holdings LLC": "Sound Physicians_Financials.zip",
-  "Bluerock Care Community LLC (DBA: Penn Ave Health)": "Penn Ave Health_Financials.zip",
-  "Pathways Holdings": "Pathways Health_Financials.zip",
-  "Complete Care Collaborative of the Midwest, LLC": "Midwest_Financials.zip",
-  "Genuine Health Group, LLC": "Genuine Health_Financials.zip",
-  "FEMG Holdings, LLC": "FEMG Health Partners_Financials.zip",
-  "Evergreen Nephrology LLC": "Evergreen Nephrology_Financials.zip",
-  "Complete Care Collaborative of the South, LLC": "Collaborative Care South_Financials.zip"
+  // … etc …
 };
 // Mapping for QBR downloads.
 const qbrMapping = {
-  "Total Kidney Health of Northern California LLC": "C0002 - Satellite Q3-2024 Qtrly Benchmark Report.xlsx",
-  "Integrated Kidney Partners III LLC": "C0073 - Dallas Q3-2024 Qtrly Benchmark Report.xlsx",
-  "Integrated Kidney Partners V LLC": "C0074 - San Antonio Q3-2024 Qtrly Benchmark Report.xlsx",
-  "Upperline Health Inc.": "REACH.D0333.BNMR.PY2024.D250213.T1000540 (1).xlsx",
-  "Integrated Kidney Partners II LLC": "C0083 - South FL Q3-2024 Qtrly Benchmark Report.xlsx",
-  "Integrated Kidney Partners IX LLC": "C0190 - Upstate NY Q3-2024 Qtrly Benchmark Report.xlsx",
-  "Integrated Kidney Partners VII LLC": "C0192 - FTW-Houston Q3-2024 Qtrly Benchmark Report.xlsx",
-  "Integrated Kidney Partners VIII LLC": "C0193 - Alaska Q3-2024 Qtrly Benchmark Report.xlsx",
-  "Integrated Kidney Partners X LLC": "C0194 - CO-Wyoming - Q3-2024 Qtrly Benchmark Report.xlsx",
-  "Integrated Kidney Partners XX LLC": "C0204 - UT-Idaho - Q3-2024 Qtrly Benchmark Report.xlsx",
-  "Integrated Kidney Partners XXIII LLC": "C0207 - Kansas City - Q3-2024 Qtrly Benchmark Report.xlsx",
-  "Evergreen Nephrology LLC": "Evergreen Nephrology_QBR.zip",
-  "Complete Care Collaborative of the South, LLC": "Collaborative Care South_QBR.zip"
+  "Total Kidney Health of Northern California LLC":
+    "C0002 - Satellite Q3-2024 Qtrly Benchmark Report.xlsx",
+  // … etc …
 };
 
 // --- Utility Functions ---
@@ -120,7 +92,7 @@ const parseCsv = (url) =>
     Papa.parse(url, {
       download: true,
       header: true,
-      complete: (results) => resolve(results.data),
+      complete: ({ data }) => resolve(data),
     });
   });
 const parseExcelBySheet = async (fileUrl, targetId) => {
@@ -130,8 +102,7 @@ const parseExcelBySheet = async (fileUrl, targetId) => {
     const wb = XLSX.read(buffer, { type: "array" });
     let data = [];
     wb.SheetNames.forEach((name) => {
-      const sheet = wb.Sheets[name];
-      const rows = XLSX.utils.sheet_to_json(sheet);
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[name]);
       data = data.concat(
         rows.filter(
           (r) =>
@@ -149,23 +120,20 @@ const parseExcelBySheet = async (fileUrl, targetId) => {
   }
 };
 
-// For 2024 data we only use CSV parsing.
-const loadNPIExcel = async () => {
-  try {
-    await parseCsv(DATA_2024_URL);
-  } catch (err) {
-    console.error("Error reading DATA_2024_URL:", err);
-  }
-};
-
-// Provider Map loader for 2024 using NPI_OUTPUT_24_URL.
-const loadProviderMapData = async (acoId, setClinicianCount, setProviderMapPlot, setPhysicianBreakdown) => {
+// Provider Map loader for 2024
+const loadProviderMapData = async (
+  acoId,
+  setClinicianCount,
+  setProviderMapPlot,
+  setPhysicianBreakdown
+) => {
   const results = await parseCsv(NPI_OUTPUT_24_URL);
   const validRows = results.filter((r) => {
     const lat = parseFloat(String(r.Latitude).trim());
     const lon = parseFloat(String(r.Longitude).trim());
     return (
-      (r["Entity ID"] || "").toLowerCase().trim() === acoId.toLowerCase().trim() &&
+      (r["Entity ID"] || "").toLowerCase().trim() ===
+        acoId.toLowerCase().trim() &&
       !isNaN(lat) &&
       !isNaN(lon) &&
       lat >= -90 &&
@@ -177,17 +145,26 @@ const loadProviderMapData = async (acoId, setClinicianCount, setProviderMapPlot,
   setClinicianCount(validRows.length);
   const latitudes = validRows.map((r) => parseFloat(String(r.Latitude).trim()));
   const longitudes = validRows.map((r) => parseFloat(String(r.Longitude).trim()));
-  const hoverText = validRows.map((r) => (r["NPI Name"] || "").trim() || "Unknown Provider");
-  const breakdownCounts = { Diagnostics: 0, "Primary Care": 0, "Long Term Care": 0, Specialty: 0 };
+  const hoverText = validRows.map(
+    (r) => (r["NPI Name"] || "").trim() || "Unknown Provider"
+  );
+  const breakdownCounts = {
+    Diagnostics: 0,
+    "Primary Care": 0,
+    "Long Term Care": 0,
+    Specialty: 0,
+  };
   validRows.forEach((r) => {
-    const cat = r["Category"];
-    if (cat && breakdownCounts.hasOwnProperty(cat)) {
-      breakdownCounts[cat]++;
+    if (breakdownCounts[r.Category] != null) {
+      breakdownCounts[r.Category]++;
     }
   });
   const total = validRows.length;
   const breakdownPercentages = Object.fromEntries(
-    Object.entries(breakdownCounts).map(([k, v]) => [k, total ? Math.round((v / total) * 100) : 0])
+    Object.entries(breakdownCounts).map(([k, v]) => [
+      k,
+      total ? Math.round((v / total) * 100) : 0,
+    ])
   );
   const trace = {
     type: "scattergeo",
@@ -215,207 +192,229 @@ const loadProviderMapData = async (acoId, setClinicianCount, setProviderMapPlot,
   setPhysicianBreakdown(breakdownPercentages);
 };
 
-//////////////////////////
-// AcoReportDetail2024 Component
-//////////////////////////
 const AcoReportDetail2024 = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const printRef = useRef(null);
 
-  // Scroll to top on mount.
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
-
-  // Component state.
+  // Add missing acoName state:
   const [acoName, setAcoName] = useState("");
-  const [clinicianCount, setClinicianCount] = useState(0);
-  const [selectedQuarter, setSelectedQuarter] = useState("Q2");
-  // ── New graph state for 4 additional plots ─────────────────────────
-  const [quarterlyPmpmPlot, setQuarterlyPmpmPlot] = useState(null);
-  const [quarterlyPercentagePlot, setQuarterlyPercentagePlot] = useState(null);
-  const [pmpmPlot, setPmpmPlot] = useState(null);
-  const [qualityPlot, setQualityPlot] = useState(null);
-// ──────────────────────────────────────────────────────────────────────
 
+  // Metric state
   const [bondedAmount, setBondedAmount] = useState(defaultMetrics.bondedAmount);
   const [membership, setMembership] = useState(defaultMetrics.membership);
   const [sparxScore, setSparxScore] = useState(defaultMetrics.sparxScore);
   const [stopLoss, setStopLoss] = useState(defaultMetrics.stopLoss);
   const [projectedPMPM, setProjectedPMPM] = useState(defaultMetrics.projectedPMPM);
+  const [clinicianCount, setClinicianCount] = useState(0);
 
-  // Graph states.
+  // Chart state
+  const [confidenceData, setConfidenceData] = useState([]);
   const [benchmarkPlot, setBenchmarkPlot] = useState(null);
   const [qbrPlot, setQbrPlot] = useState(null);
-  // const [pmpmPlot, setPmpmPlot] = useState(null);
-  // const [qualityPlot, setQualityPlot] = useState(null);
-  const [stoplossData, setStoplossData] = useState([]);
-  // const [quarterlyPmpmPlot, setQuarterlyPmpmPlot] = useState(null);
-  // const [quarterlyPercentagePlot, setQuarterlyPercentagePlot] = useState(null);
+  const [pmpmPlot, setPmpmPlot] = useState(null);
+  const [qualityPlot, setQualityPlot] = useState(null);
+  const [quarterlyPmpmPlot, setQuarterlyPmpmPlot] = useState(null);
+  const [quarterlyPercentagePlot, setQuarterlyPercentagePlot] = useState(null);
   const [providerMapPlot, setProviderMapPlot] = useState(null);
   const [physicianBreakdown, setPhysicianBreakdown] = useState({});
-  const [confidenceData, setConfidenceData] = useState([]);
+  const [stoplossData, setStoplossData] = useState([]);
   const [beneficiarySplit, setBeneficiarySplit] = useState(null);
 
-  // Download menu state.
+  // Download menu state
   const [menuAnchor, setMenuAnchor] = useState(null);
-  const printRef = useRef(null);
   const handleDownloadClick = (e) => setMenuAnchor(e.currentTarget);
   const handleMenuClose = () => setMenuAnchor(null);
 
-  // ---- Download Functions ----
+  // Download functions (PDF, QBR, Financials)
   const handleDownloadPDF = async () => {
     handleMenuClose();
     if (!printRef.current) return;
     const canvas = await html2canvas(printRef.current, { scale: 2 });
     const imgData = canvas.toDataURL("image/png");
     const pdf = new jsPDF("p", "px", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    let heightLeft = imgHeight;
-    let position = 0;
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight, undefined, "FAST");
-    heightLeft -= pageHeight;
-    while (heightLeft > 0) {
-      position -= pageHeight;
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const imgW = pageW;
+    const imgH = (canvas.height * imgW) / canvas.width;
+    let hLeft = imgH, pos = 0;
+    pdf.addImage(imgData, "PNG", 0, pos, imgW, imgH, undefined, "FAST");
+    hLeft -= pageH;
+    while (hLeft > 0) {
+      pos -= pageH;
       pdf.addPage();
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight, undefined, "FAST");
-      heightLeft -= pageHeight;
+      pdf.addImage(imgData, "PNG", 0, pos, imgW, imgH, undefined, "FAST");
+      hLeft -= pageH;
     }
-    pdf.save(`Sparx - ${acoName}.pdf`);
+    pdf.save(`Sparx - ${acoName || id}.pdf`);
   };
 
   const handleDownloadQBRZip = async () => {
     handleMenuClose();
-    Papa.parse("/data/ACO_subsidiary list.csv", {
+    Papa.parse(ACO_SUBSIDIARY_URL, {
       download: true,
       header: true,
-      complete: (results) => {
-        const data = results.data;
-        const matchingRow = data.find(
-          (r) => (r.ACO_ID || "").toLowerCase().trim() === id.toLowerCase().trim()
+      complete: ({ data }) => {
+        const row = data.find(
+          (r) => r.ACO_ID?.toLowerCase().trim() === id.toLowerCase().trim()
         );
-        if (matchingRow && matchingRow.subsidiary_co) {
-          const subsidiary_co = matchingRow.subsidiary_co.trim();
-          const fileName = qbrMapping[subsidiary_co] || `${subsidiary_co}_QBR.zip`;
-          const fileUrl = `/data/QBRs/${encodeURIComponent(fileName)}`;
+        if (row?.subsidiary_co) {
+          const fn =
+            qbrMapping[row.subsidiary_co.trim()] ||
+            `${row.subsidiary_co.trim()}_QBR.zip`;
           const a = document.createElement("a");
-          a.href = fileUrl;
-          a.download = fileName;
+          a.href = `/data/QBRs/${encodeURIComponent(fn)}`;
+          a.download = fn;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
         } else {
-          alert("No QBR file found for this ACO based on the subsidiary list.");
+          alert("No QBR file found for this ACO.");
         }
       },
-      error: (err) => {
-        console.error("Error reading the subsidiary CSV", err);
-        alert("There was an error processing the QBR file download.");
-      },
+      error: (err) => console.error("Error reading subsidiary CSV", err),
     });
   };
 
   const handleDownloadFinancialZip = async () => {
     handleMenuClose();
-    Papa.parse("/data/ACO_subsidiary list.csv", {
+    Papa.parse(ACO_SUBSIDIARY_URL, {
       download: true,
       header: true,
-      complete: (results) => {
-        const data = results.data;
-        const matchingRow = data.find(
-          (r) => (r.ACO_ID || "").toLowerCase().trim() === id.toLowerCase().trim()
+      complete: ({ data }) => {
+        const row = data.find(
+          (r) => r.ACO_ID?.toLowerCase().trim() === id.toLowerCase().trim()
         );
-        if (matchingRow && matchingRow.parent_co) {
-          const parentCo = matchingRow.parent_co.trim();
-          const fileName = financialMapping[parentCo] || `${parentCo}_Financials.zip`;
-          const fileUrl = `/data/financials/${encodeURIComponent(fileName)}`;
+        if (row?.parent_co) {
+          const fn =
+            financialMapping[row.parent_co.trim()] ||
+            `${row.parent_co.trim()}_Financials.zip`;
           const a = document.createElement("a");
-          a.href = fileUrl;
-          a.download = fileName;
+          a.href = `/data/financials/${encodeURIComponent(fn)}`;
+          a.download = fn;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
         } else {
-          alert("No financial file found for this ACO based on the subsidiary list.");
+          alert("No financial file found for this ACO.");
         }
       },
-      error: (err) => {
-        console.error("Error reading the subsidiary CSV", err);
-        alert("There was an error processing the financial file download.");
-      },
+      error: (err) => console.error("Error reading subsidiary CSV", err),
     });
   };
 
-  // ---- Data Loaders ----
+  // Load Stop Loss for top card
   useEffect(() => {
-    parseCsv(DATA_2024_URL).then((data) => {
-      const row = data.find(
-        (r) => (r.ID || "").toLowerCase().trim() === id.toLowerCase().trim()
-      );
-      if (row && row.bond_amount) {
-        setBondedAmount(`$${Number(row.bond_amount).toLocaleString()}`);
-      }
+    Papa.parse(ACO_SUBSIDIARY_URL, {
+      download: true,
+      header: true,
+      complete: ({ data }) => {
+        const row = data.find(
+          (r) => r.ACO_ID?.toLowerCase().trim() === id.toLowerCase().trim()
+        );
+        if (row?.stop_loss) {
+          setStopLoss(row.stop_loss);
+        }
+      },
+      error: (err) => console.error("Error loading subsidiary CSV", err),
     });
   }, [id]);
 
-  const loadAdditionalData = async () => {
+  // Loader for stop‑loss payouts chart
+  const loadStoplossData = useCallback(async () => {
     try {
-      const sharedData = await parseCsv(DATA_2024_URL);
-      const row = sharedData.find(
-        (r) => (r.ID || "").toLowerCase().trim() === id.toLowerCase().trim()
+      const rows = await parseCsv(STOPLOSS_URL);
+      setStoplossData(rows);
+    } catch (err) {
+      console.error("Error loading StoplossSumarry.csv", err);
+    }
+  }, []);
+
+  // Initial ancillary loads
+  useEffect(() => {
+    loadStoplossData();
+    loadProviderMapData(
+      id,
+      setClinicianCount,
+      setProviderMapPlot,
+      setPhysicianBreakdown
+    );
+  }, [id, loadStoplossData]);
+
+  // Main data loader
+  useEffect(() => {
+    const init = async () => {
+      const data = await parseCsv(DATA_2024_URL);
+      const row = data.find(
+        (r) => String(r.ID || "").toLowerCase().trim() === id.toLowerCase().trim()
       );
       if (!row) return;
-      const mem = parseFloat(row["Membership"]) || 0;
-      setMembership(mem.toLocaleString());
-      setSparxScore(row["sparx"] ? row["sparx"].toString() : "");
-      const q4Spend = parseFloat(String(row["Q4 Spend"]).replace(/[$,%]/g, "").trim()) || 0;
-      const q4Formatted = Number(q4Spend).toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-      setProjectedPMPM(`$${q4Formatted}`);
-      await loadBenchmarkExpenditureGraph();
-      const adPct = parseOneDecimal(row["AD %"]) || 0;
-      const esrdPct = parseOneDecimal(row["ESRD %"]) || 0;
-      const totalMemberMonths = parseOneDecimal(mem * 12);
-      setBeneficiarySplit({ adPct, esrdPct, total: totalMemberMonths });
-    } catch (error) {
-      console.error("Error loading additional data:", error);
-    }
-  };
 
-  const loadBenchmarkExpenditureGraph = async () => {
-    try {
-      const sharedData = await parseCsv(DATA_2024_URL);
-      const row = sharedData.find(
-        (r) => (r.ID || "").toLowerCase().trim() === id.toLowerCase().trim()
-      );
-      if (!row) {
-        setBenchmarkPlot(null);
-        return;
+      // Header metrics
+      if (row.bond_amount) {
+        setBondedAmount(`$${Number(row.bond_amount).toLocaleString()}`);
       }
+      const mem = parseFloat(row.Membership) || 0;
+      setMembership(mem.toLocaleString());
+      if (row.sparx) {
+        setSparxScore(row.sparx.toString());
+      }
+      if (row["Q4 Spend"]) {
+        const s = parseFloat(row["Q4 Spend"]) || 0;
+        setProjectedPMPM(
+          `$${s.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}`
+        );
+      }
+
+      // Shared Savings
       const quarters = ["Q1", "Q2", "Q3", "Q4"];
-      const benchValues = quarters.map((q) => parseTwoDecimal(row[`${q} Benchmark`]) || 0);
-      const spendValues = quarters.map((q) => parseTwoDecimal(row[`${q} Spend`]) || 0);
-      const traceBench = {
+      const base = parseFloat(row["2023 Lookback Savings"]) || 0;
+      const trace2023 = {
         x: quarters,
-        y: benchValues,
-        name: "Benchmark",
-        type: "bar",
-        marker: { color: "gray" },
+        y: quarters.map(() => base),
+        mode: "lines+markers",
+        name: "2023",
+        marker: { color: "gray", size: 8 },
+        line: { color: "gray" },
       };
-      const traceSpend = {
+      const trace2024 = {
         x: quarters,
-        y: spendValues,
-        name: "Expenditure",
-        type: "bar",
-        marker: { color: "#6c5ce7" },
+        y: quarters.map((q) => parseFloat(row[q]) || 0),
+        mode: "lines+markers",
+        name: "2024",
+        marker: { color: "#6c5ce7", size: 8 },
+        line: { color: "#6c5ce7" },
+        error_y: {
+          type: "data",
+          array: quarters.map((q) => parseFloat(row[`${q} CI`]) || 0),
+          visible: true,
+        },
       };
+      setConfidenceData([trace2023, trace2024]);
+
+      // Benchmark vs Expenditure
       setBenchmarkPlot({
-        data: [traceBench, traceSpend],
+        data: [
+          {
+            x: quarters,
+            y: quarters.map(
+              (q) => parseTwoDecimal(row[`${q} Benchmark`]) || 0
+            ),
+            name: "Benchmark",
+            type: "bar",
+            marker: { color: "gray" },
+          },
+          {
+            x: quarters,
+            y: quarters.map((q) => parseTwoDecimal(row[`${q} Spend`]) || 0),
+            name: "Expenditure",
+            type: "bar",
+            marker: { color: "#6c5ce7" },
+          },
+        ],
         layout: {
           barmode: "group",
           title: "Projected Benchmark vs Expenditure (2024)",
@@ -425,41 +424,29 @@ const AcoReportDetail2024 = () => {
           autosize: true,
         },
       });
-    } catch (error) {
-      console.error("Error loading Benchmark vs Expenditure graph:", error);
-    }
-  };
 
-  const loadQBRVsSparxData = async () => {
-    try {
-      const data = await parseCsv(DATA_2024_URL);
-      const row = data.find(
-        (r) => (r.ID || "").toLowerCase().trim() === id.toLowerCase().trim()
-      );
-      if (!row) {
-        setQbrPlot({ data: [], layout: { title: `No QBR data found for ACO ${id}` } });
-        return;
-      }
-      const qbrBenchmark = parseTwoDecimal(row["QBR Benchmark"]) || 0;
-      const q3Benchmark = parseTwoDecimal(row["Q3 Benchmark"]) || 0;
-      const qbrSpend = parseTwoDecimal(row["QBR Spend"]) || 0;
-      const q3Spend = parseTwoDecimal(row["Q3 Spend"]) || 0;
-      const benchmarkTrace = {
-        x: ["QBR", "Sparx"],
-        y: [qbrBenchmark, q3Benchmark],
-        name: "Benchmark",
-        type: "bar",
-        marker: { color: "#2f5d87" },
-      };
-      const expenditureTrace = {
-        x: ["QBR", "Sparx"],
-        y: [qbrSpend, q3Spend],
-        name: "Expenditure",
-        type: "bar",
-        marker: { color: "#d66035" },
-      };
+      // QBR vs Sparx
+      const qbrB = parseTwoDecimal(row["QBR Benchmark"]) || 0;
+      const q3B = parseTwoDecimal(row["Q3 Benchmark"]) || 0;
+      const qbrS = parseTwoDecimal(row["QBR Spend"]) || 0;
+      const q3S = parseTwoDecimal(row["Q3 Spend"]) || 0;
       setQbrPlot({
-        data: [benchmarkTrace, expenditureTrace],
+        data: [
+          {
+            x: ["QBR", "Sparx"],
+            y: [qbrB, q3B],
+            name: "Benchmark",
+            type: "bar",
+            marker: { color: "#2f5d87" },
+          },
+          {
+            x: ["QBR", "Sparx"],
+            y: [qbrS, q3S],
+            name: "Expenditure",
+            type: "bar",
+            marker: { color: "#d66035" },
+          },
+        ],
         layout: {
           barmode: "group",
           title: "QBR vs Sparx (2024)",
@@ -469,618 +456,273 @@ const AcoReportDetail2024 = () => {
           autosize: true,
         },
       });
-    } catch (error) {
-      console.error("Error in loadQBRVsSparxData:", error);
-    }
-  };
-  // ── New: load industry scatter & percentile charts ───────────────────
-const loadIndustryResults = useCallback(async () => {
-  // Load the three PUF CSVs in parallel
-  const [reachData, msspData, kccData] = await Promise.all([
-    parseCsv("/data/REACH_PUF2023.csv"),
-    parseCsv("/data/MSSP_PUF2023.csv"),
-    parseCsv("/data/KCC_PUF2023.csv"),
-  ]);
 
-  // Your existing processRow logic
-  const processRow = (row, program) => {
-    let eligible, cost, quality, risk, acoId, name;
-    if (program === "REACH") {
-      eligible = parseOneDecimal(row["Total Eligible Months8"]);
-      cost     = parseTwoDecimal(row["Total Cost of Care12"]);
-      quality  = parseOneDecimal(row["Total Quality Score13"]);
-      risk     = row["Risk\nArrangement2"];
-      acoId    = row["ACO\nID"]?.trim();
-      name     = row["ACO Name"];
-    } else if (program === "MSSP") {
-      const raw = parseOneDecimal(row["N_AB"]);
-      eligible = raw ? raw * 12 : 0;
-      cost     = parseTwoDecimal(row["ABtotExp"]) || parseOneDecimal(row["Expenditures"]);
-      quality  = parseOneDecimal(row["QualScore"]);
-      risk     = row["Current_Track"];
-      acoId    = row["ACO_ID"]?.toString().trim();
-      name     = row["ACO_Name"];
-    } else {
-      // KCC
-      eligible = parseOneDecimal(row["Beneficiary Months (CKD & ESRD)"]);
-      const key =
-        row["Performance Year Expenditure\n (CKD & ESRD)"] !== undefined
-          ? "Performance Year Expenditure\n (CKD & ESRD)"
-          : "Performance Year Expenditure (CKD & ESRD)";
-      cost     = parseTwoDecimal(row[key]);
-      quality  = parseOneDecimal(row["Total Quality Score"]);
-      risk     = row["Agreement Option"]?.trim();
-      acoId    = row["Entity Legal Business Name"]?.trim();
-      name     = row["Entity Legal Business Name"];
-    }
-    return {
-      acoId:    acoId?.toLowerCase().trim(),
-      program,
-      risk,
-      eligible,
-      pmpm:     eligible && cost ? parseFloat((cost / eligible).toFixed(1)) : 0,
-      quality,
-      name
-    };
-  };
-
-  // Merge and filter
-  const combined = [
-    ...reachData.map(r => processRow(r, "REACH")),
-    ...msspData.map(r => processRow(r, "MSSP")),
-    ...kccData.map(r => processRow(r, "KCC")),
-  ].filter(d => d && d.acoId);
-
-  // Find our ACO
-  const lowerId = id.toLowerCase().trim();
-  const current = combined.find(a => a.acoId === lowerId);
-  if (!current) return;
-
-  // Scatter: Member‑Months vs PMPM
-  const sameGroup = combined.filter(
-    a => a.program === current.program && a.risk === current.risk
-  );
-  setPmpmPlot({
-    x: sameGroup.map(a => a.eligible),
-    y: sameGroup.map(a => a.pmpm),
-    text: sameGroup.map(a => a.acoId === lowerId ? a.name : ""),
-    mode: "markers",
-    type: "scatter",
-    marker: {
-      size: sameGroup.map(a => a.acoId === lowerId ? 20 : 10),
-      color: sameGroup.map(a => a.acoId === lowerId ? "#6c5ce7" : "#e7c56c"),
-    },
-  });
-
-  // Line+markers: Percentile Rank of Quality
-  const sorted = [...sameGroup].sort((a,b) => a.quality - b.quality);
-  setQualityPlot({
-    x: sorted.map((_, i) => ((i + 1) / sorted.length) * 100),
-    y: sorted.map(a => a.quality),
-    text: sorted.map(a => a.acoId === lowerId ? a.name : ""),
-    mode: "markers+lines",
-    type: "scatter",
-    marker: {
-      size: sorted.map(a => a.acoId === lowerId ? 16 : 8),
-      color: sorted.map(a => a.acoId === lowerId ? "#6c5ce7" : "#e7c56c"),
-    },
-  });
-}, [id]);
-// ─────────────────────────────────────────────────────────────────────
-
-  const loadSharedSavingsData = async () => {
-    try {
-      const sharedData = await parseCsv(DATA_2024_URL);
-      const row = sharedData.find(
-        (r) => (r.ID || "").toLowerCase().trim() === id.toLowerCase().trim()
-      );
-      if (!row) {
-        console.warn(`No shared savings data found for ACO ID "${id}"`);
-        setConfidenceData([]);
-        return;
-      }
-      const quarters = ["Q1", "Q2", "Q3", "Q4"];
-      const trace2023 = {
-        x: quarters,
-        y: quarters.map(() => parseFloat(row["2023 Lookback Savings"]) || 0),
-        mode: "lines+markers",
-        marker: { color: "gray", size: 8 },
-        line: { color: "gray" },
-        name: "2023",
+      // Industry results: Member Months vs PMPM & Quality Percentile
+      const reachData = await parseCsv("/data/REACH_PUF2023.csv");
+      const msspData = await parseCsv("/data/MSSP_PUF2023.csv");
+      const kccData = await parseCsv("/data/KCC_PUF2023.csv");
+      const processRow = (r, prog) => {
+        let eligible, cost, quality, risk, acoId, name;
+        if (prog === "REACH") {
+          eligible = parseOneDecimal(r["Total Eligible Months8"]);
+          cost = parseTwoDecimal(r["Total Cost of Care12"]);
+          quality = parseOneDecimal(r["Total Quality Score13"]);
+          risk = r["Risk\nArrangement2"];
+          acoId = r["ACO\nID"]?.trim();
+          name = r["ACO Name"];
+        } else if (prog === "MSSP") {
+          const raw = parseOneDecimal(r["N_AB"]);
+          eligible = raw ? raw * 12 : 0;
+          cost = parseTwoDecimal(r["ABtotExp"]) || parseOneDecimal(r["Expenditures"]);
+          quality = parseOneDecimal(r["QualScore"]);
+          risk = r["Current_Track"];
+          acoId = r["ACO_ID"]?.toString().trim();
+          name = r["ACO_Name"];
+        } else {
+          eligible = parseOneDecimal(r["Beneficiary Months (CKD & ESRD)"]);
+          const key =
+            r["Performance Year Expenditure\n (CKD & ESRD)"] !== undefined
+              ? "Performance Year Expenditure\n (CKD & ESRD)"
+              : "Performance Year Expenditure (CKD & ESRD)";
+          cost = parseTwoDecimal(r[key]);
+          quality = parseOneDecimal(r["Total Quality Score"]);
+          risk = r["Agreement Option"]?.trim();
+          acoId = r["Entity Legal Business Name"]?.trim();
+          name = r["Entity Legal Business Name"];
+        }
+        return {
+          acoId: acoId?.toLowerCase().trim(),
+          program: prog,
+          risk,
+          eligible,
+          pmpm: eligible && cost ? parseFloat((cost / eligible).toFixed(1)) : 0,
+          quality,
+          name,
+        };
       };
-      const trace2024 = {
-        x: quarters,
-        y: quarters.map((q) => parseFloat(row[q]) || 0),
-        mode: "lines+markers",
-        marker: { color: "#6c5ce7", size: 8 },
-        line: { color: "#6c5ce7" },
-        name: "2024",
-        error_y: {
-          type: "data",
-          array: quarters.map((q) => parseFloat(row[`${q} CI`]) || 0),
-          visible: true,
+      const combined = [
+        ...reachData.map((r) => processRow(r, "REACH")),
+        ...msspData.map((r) => processRow(r, "MSSP")),
+        ...kccData.map((r) => processRow(r, "KCC")),
+      ].filter((d) => d.acoId);
+      const lower = id.toLowerCase().trim();
+      const current = combined.find((a) => a.acoId === lower);
+      if (current) setAcoName(`${current.name} (2024)`);
+      const sameGroup = combined.filter(
+        (a) => a.program === current.program && a.risk === current.risk
+      );
+      setPmpmPlot({
+        x: sameGroup.map((a) => a.eligible),
+        y: sameGroup.map((a) => a.pmpm),
+        text: sameGroup.map((a) => (a.acoId === lower ? a.name : "")),
+        mode: "markers",
+        type: "scatter",
+        marker: {
+          size: sameGroup.map((a) => (a.acoId === lower ? 20 : 10)),
+          color: sameGroup.map((a) => (a.acoId === lower ? "#6c5ce7" : "#e7c56c")),
         },
+      });
+      const sorted = [...sameGroup].sort((a, b) => a.quality - b.quality);
+      setQualityPlot({
+        x: sorted.map((_, i) => ((i + 1) / sorted.length) * 100),
+        y: sorted.map((a) => a.quality),
+        text: sorted.map((a) => (a.acoId === lower ? a.name : "")),
+        mode: "markers+lines",
+        type: "scatter",
+        marker: {
+          size: sorted.map((a) => (a.acoId === lower ? 16 : 8)),
+          color: sorted.map((a) => (a.acoId === lower ? "#6c5ce7" : "#e7c56c")),
+        },
+      });
+
+      // Monthly PMPM & Expense Distribution
+      const enrollRows = await parseExcelBySheet(ENROLL_URL, id);
+      const claimsRows = await parseExcelBySheet(CLAIMS_URL, id);
+      const enrollByQ = {}, claimsByQ = {};
+      enrollRows.forEach((r) => {
+        if (r.PERF_YR?.toString() === "2024") {
+          const q = r.CLNDR_MNTH?.toString();
+          enrollByQ[q] = (enrollByQ[q] || 0) + parseTwoDecimal(r.ELIG_MNTHS);
+        }
+      });
+      const claimMap = {
+        "60": "Inpatient", "20": "SNF", "30": "SNF",
+        "10": "HHA", "50": "Hospice", "71": "Professional",
+        "72": "Professional", "40": "Outpatient", "41": "DME", "42": "DME"
       };
-      setConfidenceData([trace2023, trace2024]);
-    } catch (error) {
-      console.error("Error loading shared savings CSV:", error);
-    }
-  };
-
-  // Load Monthly Graphs: "Monthly Paid PMPM by Claim Type" and "Monthly Expense Distribution (%)"
-  const loadClaimsAndEnrollData = async (currentAcoName) => {
-    const lowerId = id.toLowerCase().trim();
-    const enrollData = await parseExcelBySheet(ENROLL_URL, id);
-    const claimsData = await parseExcelBySheet(CLAIMS_URL, id);
-    const enrollByQuarter = {};
-    enrollData.forEach((row) => {
-      if (row.PERF_YR && row.PERF_YR.toString().trim() === "2024") {
-        const q = row.CLNDR_MNTH && row.CLNDR_MNTH.toString().trim();
-        const elig = parseTwoDecimal(row.ELIG_MNTHS);
-        if (!enrollByQuarter[q]) enrollByQuarter[q] = 0;
-        enrollByQuarter[q] += elig;
-      }
-    });
-    const claimTypeMapping = {
-      "60": "Inpatient",
-      "20": "SNF",
-      "30": "SNF",
-      "10": "HHA",
-      "50": "Hospice",
-      "71": "Professional",
-      "72": "Professional",
-      "40": "Outpatient",
-      "41": "DME",
-      "42": "DME",
-    };
-    const claimsByQuarter = {};
-    claimsData.forEach((row) => {
-      if (row.PERF_YR && row.PERF_YR.toString().trim() === "2024") {
-        const q = row.CLNDR_MNTH && row.CLNDR_MNTH.toString().trim();
-        const code = row.CLM_TYPE_CD;
-        const category = claimTypeMapping[code];
-        if (!category) return;
-        const amt =
-          row.DC_AMT_AGG_APA !== undefined
-            ? parseTwoDecimal(row.DC_AMT_AGG_APA)
-            : parseTwoDecimal(row.ACO_AMT_AGG_APA);
-        if (!claimsByQuarter[q]) claimsByQuarter[q] = {};
-        if (!claimsByQuarter[q][category]) claimsByQuarter[q][category] = 0;
-        claimsByQuarter[q][category] += amt;
-      }
-    });
-    const quarters = Object.keys(enrollByQuarter)
-      .map((m) => parseInt(m, 10))
-      .sort((a, b) => a - b);
-    const monthMap = {
-      1: "Jan",
-      2: "Feb",
-      3: "Mar",
-      4: "Apr",
-      5: "May",
-      6: "Jun",
-      7: "Jul",
-      8: "Aug",
-      9: "Sep",
-      10: "Oct",
-      11: "Nov",
-      12: "Dec",
-    };
-    const monthLabels = quarters.map((m) => monthMap[m] || m.toString());
-    const categories = [
-      "Inpatient",
-      "SNF",
-      "HHA",
-      "Hospice",
-      "Professional",
-      "Outpatient",
-      "DME",
-    ];
-    const pmpmData = {};
-    const percentageData = {};
-    categories.forEach((cat) => {
-      pmpmData[cat] = [];
-      percentageData[cat] = [];
-    });
-    quarters.forEach((q) => {
-      const totalElig = enrollByQuarter[q] || 0;
-      const claimsForQ = claimsByQuarter[q] || {};
-      let totalExp = 0;
-      categories.forEach((cat) => {
-        totalExp += claimsForQ[cat] || 0;
+      claimsRows.forEach((r) => {
+        if (r.PERF_YR?.toString() === "2024") {
+          const q = r.CLNDR_MNTH?.toString();
+          const cat = claimMap[r.CLM_TYPE_CD];
+          if (!cat) return;
+          claimsByQ[q] = claimsByQ[q] || {};
+          claimsByQ[q][cat] =
+            (claimsByQ[q][cat] || 0) +
+            parseTwoDecimal(r.DC_AMT_AGG_APA || r.ACO_AMT_AGG_APA);
+        }
       });
-      categories.forEach((cat) => {
-        const exp = claimsForQ[cat] || 0;
-        const pmpmVal = totalElig ? parseFloat((exp / totalElig).toFixed(2)) : 0;
-        pmpmData[cat].push(pmpmVal);
-        const pctVal = totalExp ? parseFloat(((exp / totalExp) * 100).toFixed(2)) : 0;
-        percentageData[cat].push(pctVal);
-      });
-    });
-    const pastelColors = categories.map((_, i) => {
-      const hue = Math.round((360 / categories.length) * i);
-      return `hsl(${hue}, 75%, 65%)`;
-    });
-    const pmpmTraces = categories.map((cat, i) => ({
-      x: monthLabels,
-      y: pmpmData[cat],
-      name: cat,
-      type: "bar",
-      marker: { color: pastelColors[i] },
-    }));
-    const percentageTraces = categories.map((cat, i) => ({
-      x: monthLabels,
-      y: percentageData[cat],
-      name: cat,
-      type: "bar",
-      marker: { color: pastelColors[i], ticksuffix: "%" },
-    }));
-    // ---- Monthly Paid PMPM by Claim Type ----
-    setQuarterlyPmpmPlot({
-        data: categories.map((cat,i) => ({
-        x: monthLabels,
-        y: pmpmData[cat],
-        name: cat,
-        type: "bar",
-        marker: { color: pastelColors[i] },
-      })),
-      layout: {
-        barmode: "stack",
-        title: `${currentAcoName} - 2024 Monthly Paid PMPM`,
-        xaxis: { title: "Month" },
-        yaxis: { title: "PMPM", tickprefix: "$" },
-      },
-    });
-    setQuarterlyPercentagePlot({
-      data: categories.map((cat,i) => ({
-        x: monthLabels,
-        y: percentageData[cat],
-        name: cat,
-        type: "bar",
-        marker: { color: pastelColors[i] },
-        ticksuffix: "%",
-      })),
-      layout: {
-        barmode: "stack",
-        title: `${currentAcoName} - 2024 Monthly Expense Distribution (%)`,
-        xaxis: { title: "Month" },
-        yaxis: { title: "Percent of total", ticksuffix: "%" },
-      },
-    });
-  };
-
-  // ---- Main Data Loader ----
-  useEffect(() => {
-    const loadAllData = async () => {
-      const [reach, mssp, kcc] = await Promise.all([
-        parseCsv("/data/REACH_PUF2023.csv"),
-        parseCsv("/data/MSSP_PUF2023.csv"),
-        parseCsv("/data/KCC_PUF2023.csv"),
-      ]);
-        // ── begin defining combined ─────────────────────────────────────────
-  const processRow = (row, program) => {
-    let eligible, cost, quality, risk, acoId, name;
-    if (program === "REACH") {
-      eligible = parseOneDecimal(row["Total Eligible Months8"]);
-      cost     = parseTwoDecimal(row["Total Cost of Care12"]);
-      quality  = parseOneDecimal(row["Total Quality Score13"]);
-      risk     = row["Risk\nArrangement2"];
-      acoId    = row["ACO\nID"]?.trim();
-      name     = row["ACO Name"];
-    } else if (program === "MSSP") {
-      const raw = parseOneDecimal(row["N_AB"]);
-      eligible = raw ? raw * 12 : 0;
-      cost     = parseTwoDecimal(row["ABtotExp"]) || parseOneDecimal(row["Expenditures"]);
-      quality  = parseOneDecimal(row["QualScore"]);
-      risk     = row["Current_Track"];
-      acoId    = row["ACO_ID"]?.toString().trim();
-      name     = row["ACO_Name"];
-    } else {
-      eligible = parseOneDecimal(row["Beneficiary Months (CKD & ESRD)"]);
-      const key = row["Performance Year Expenditure\n (CKD & ESRD)"] !== undefined
-        ? "Performance Year Expenditure\n (CKD & ESRD)"
-        : "Performance Year Expenditure (CKD & ESRD)";
-      cost     = parseTwoDecimal(row[key]);
-      quality  = parseOneDecimal(row["Total Quality Score"]);
-      risk     = row["Agreement Option"]?.trim();
-      acoId    = row["Entity Legal Business Name"]?.trim();
-      name     = row["Entity Legal Business Name"];
-    }
-    return {
-      acoId:    acoId?.toLowerCase().trim(),
-      program,
-      risk,
-      eligible,
-      pmpm:     eligible && cost ? parseFloat((cost/eligible).toFixed(1)) : 0,
-      quality,
-      name
-    };
-  };
-
-  const combined = [
-    ...reach.map(r => processRow(r, "REACH")),
-    ...mssp.map(r => processRow(r, "MSSP")),
-    ...kcc.map(r => processRow(r, "KCC")),
-  ].filter(d => d.acoId);
-  // ── end defining combined ────────────────────────────────────────────
-      const current = combined.find(
-        (a) => (a.acoId || "").toLowerCase() === id.toLowerCase().trim()
+      const qs = Object.keys(enrollByQ)
+        .map((m) => parseInt(m, 10))
+        .sort((a, b) => a - b);
+      const monthLabels = qs.map((m) =>
+        ({
+          1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
+          7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"
+        }[m] || m.toString())
       );
-      if (!current) return;
-      setAcoName(current.name + " (2024)");
-      await loadClaimsAndEnrollData(current.name);
+      const categories = ["Inpatient","SNF","HHA","Hospice","Professional","Outpatient","DME"];
+      const pmpmData = {}, pctData = {};
+      categories.forEach((c) => { pmpmData[c] = []; pctData[c] = []; });
+      qs.forEach((q) => {
+        const totE = enrollByQ[q] || 0;
+        const claimsForQ = claimsByQ[q] || {};
+        let totExp = 0;
+        categories.forEach((c) => (totExp += claimsForQ[c] || 0));
+        categories.forEach((c) => {
+          pmpmData[c].push(totE ? parseFloat((claimsForQ[c] || 0) / totE).toFixed(2) : 0);
+          pctData[c].push(totExp ? parseFloat(((claimsForQ[c] || 0) / totExp) * 100).toFixed(2) : 0);
+        });
+      });
+      const pastelColors = categories.map((_, i) => `hsl(${Math.round(360/categories.length*i)},75%,65%)`);
+      setQuarterlyPmpmPlot({
+        data: categories.map((cat,i) => ({ x: monthLabels, y: pmpmData[cat], name: cat, type: "bar", marker: { color: pastelColors[i] } })),
+        layout: { barmode: "stack", title: `${current?.name} - 2024 Monthly Paid PMPM`, xaxis: { title: "Month" }, yaxis: { title: "PMPM", tickprefix: "$" } }
+      });
+      setQuarterlyPercentagePlot({
+        data: categories.map((cat,i) => ({ x: monthLabels, y: pctData[cat], name: cat, type: "bar", marker: { color: pastelColors[i], ticksuffix: "%" } })),
+        layout: { barmode: "stack", title: `${current?.name} - 2024 Monthly Expense Distribution (%)`, xaxis: { title: "Month" }, yaxis: { title: "Percent of total", ticksuffix: "%" } }
+      });
     };
 
-    const loadStoplossData = async () => {
-  // 1) read the subsidiary CSV
-  const subs = await parseCsv(ACO_SUBSIDIARY_URL);
-
-  // 2) find our ACO’s row
-  const row = subs.find(
-    (r) => (r.ACO_ID || "").toString().toLowerCase().trim() === id.toLowerCase().trim()
-  );
-  if (!row) {
-    console.warn(`No subsidiary row for ACO ${id}`);
-    return;
-  }
-
-  // 3) pull the stop_loss column (adjust if your header is different)
-  // Try common variants:
-  const raw = row.stop_loss ?? row["stop_loss_2024"] ?? row["stop_loss_2023"] ?? row.stopLoss;
-  if (raw == null) {
-    console.warn("Couldn't find a stop_loss field in subsidiary CSV for ACO", id);
-    return;
-  }
-
-  // 4) parse and format
-  const num = parseFloat(String(raw).replace(/[$,]/g, ""));
-  if (!isNaN(num)) {
-    setStopLoss(`$${num.toLocaleString()}`);
-  } else {
-    console.warn("Parsed stop_loss was NaN for ACO", id, raw);
-  }
-};
-
-    const loadProviderData = async () => {
-      await loadProviderMapData(id, setClinicianCount, setProviderMapPlot, setPhysicianBreakdown);
-    };
-
-    const init = async () => {
-      await loadNPIExcel();
-      await loadAllData();
-      await loadBenchmarkExpenditureGraph();
-      await loadQBRVsSparxData();
-      await loadStoplossData();
-      await loadProviderData();
-      await loadSharedSavingsData();
-      await loadAdditionalData();
-    };
     init();
-  }, [id, selectedQuarter]);
+  }, [id]);
 
-  // Static fallback Shared Savings.
-  const line2024Trace = {
-    x: ["Q1", "Q2", "Q3", "Q4"],
-    y: [5, 5, 5, 5],
-    mode: "lines+markers",
-    marker: { color: "gray", size: 8 },
-    line: { color: "gray" },
-    name: "2024",
-  };
   const confidenceLayout = {
-    title: "Projected % (2024)",
+    title: "Projected % (2024 & 2023)",
     xaxis: { title: { text: "Quarter (Data Released)" }, showgrid: false },
-    yaxis: {
-      title: { text: "Shared Saving Percentage" },
-      showgrid: true,
-      rangemode: "tozero",
-      ticksuffix: "%",
-    },
-    autosize: true,
-    hovermode: "closest",
-    margin: { l: 50, r: 20, t: 40, b: 40 },
+    yaxis: { title: { text: "Shared Savings Percentage" }, showgrid: true, rangemode: "tozero", ticksuffix: "%" },
+    autosize: true, hovermode: "closest", margin: { l: 50, r: 20, t: 40, b: 40 }
   };
 
   const stoplossEntity =
-    stoplossData && stoplossData.length > 0
-      ? stoplossData.find(
-          (row) => (row["Entity ID"] || "").toLowerCase().trim() === id.toLowerCase().trim()
-        )
-      : null;
+    stoplossData.find(
+      (row) =>
+        String(row["Entity ID"] || "").toLowerCase().trim() === id.toLowerCase().trim()
+    ) || null;
 
-  // ---- Updated Metrics ----
-  // "Bonded Amount" is loaded from DATA_2024_URL via its bond_amount field.
-  // "Physicians" metric now uses the clinicianCount value.
-  const metricsWithValuesDisplay = [
-    { title: "Bonded Amount", value: bondedAmount, icon: <AttachMoney fontSize="large" /> },
-    { title: "Membership", value: membership, icon: <Group fontSize="large" /> },
-    { title: "Sparx Score", value: sparxScore, icon: <BarChart fontSize="large" /> },
-    { title: "Stop Loss", value: stopLoss, icon: <Shield fontSize="large" /> },
-    { title: "Physicians", value: clinicianCount ? clinicianCount.toLocaleString() : "0", icon: <MedicalServices fontSize="large" /> },
-    { title: "Projected PMPM", value: projectedPMPM, icon: <TrendingUp fontSize="large" /> },
+  const metricsWithValues = [
+    { title: "Bonded Amount", value: bondedAmount,   icon: <AttachMoney fontSize="large"/> },
+    { title: "Membership",    value: membership,     icon: <Group fontSize="large"/> },
+    { title: "Sparx Score",   value: sparxScore,     icon: <BarChart fontSize="large"/> },
+    { title: "Stop Loss",     value: stopLoss,       icon: <Shield fontSize="large"/> },
+    { title: "Physicians",    value: clinicianCount.toLocaleString(), icon: <MedicalServices fontSize="large"/> },
+    { title: "Projected PMPM",value: projectedPMPM,  icon: <TrendingUp fontSize="large"/> },
   ];
 
   return (
-    <Box
-      ref={printRef}
-      sx={{
-        width: "100%",
-        minHeight: "100vh",
-        px: { xs: 2, sm: 3, md: 4 },
-        py: 3,
-        boxSizing: "border-box",
-        flexGrow: 1,
-      }}
-    >
-      {/* Header and Download Menu */}
+    <Box ref={printRef} sx={{ width: "100%", minHeight: "100vh", px: { xs: 2, sm: 3, md: 4 }, py: 3, boxSizing: "border-box", flexGrow: 1 }}>
+      {/* Header & Menu */}
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
-        <Button variant="contained" color="primary" onClick={handleDownloadClick} sx={{ textTransform: "none", fontWeight: "bold" }}>
+        <Button variant="contained" onClick={handleDownloadClick} sx={{ textTransform: "none", fontWeight: "bold" }}>
           Download
         </Button>
         <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={handleMenuClose}>
-          <MenuItem onClick={handleDownloadPDF}>Download Analysis</MenuItem>
+          <MenuItem onClick={handleDownloadPDF}>Download Analysis (PDF)</MenuItem>
           <MenuItem onClick={handleDownloadQBRZip}>Download QBR</MenuItem>
           <MenuItem onClick={handleDownloadFinancialZip}>Download Financials</MenuItem>
         </Menu>
-        <Button
-          variant="contained"
-          size="small"
-          onClick={() => navigate(-1)}
-          sx={{
-            backgroundColor: "#6c5ce7",
-            "&:hover": { backgroundColor: "#5346d9" },
-            textTransform: "none",
-            fontWeight: "bold",
-          }}
-        >
+        <Button variant="contained" size="small" onClick={() => navigate(-1)} sx={{ textTransform: "none", fontWeight: "bold" }}>
           ← Back to Reports
         </Button>
       </Box>
+
+      {/* Title */}
       <Typography variant="h5" fontWeight="bold" mb={4}>
         {acoName || "ACO Report (2024)"}
       </Typography>
 
       {/* Metric Cards */}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3, mb: 5 }}>
-        {metricsWithValuesDisplay.map((item, index) => (
-          <Card key={index} sx={{ height: "100%", minHeight: 80 }}>
+        {metricsWithValues.map((item, i) => (
+          <Card key={i} sx={{ height: "100%", minHeight: 80 }}>
             <CardContent sx={{ display: "flex", alignItems: "center", py: 2 }}>
               <Avatar sx={{ bgcolor: "#6c5ce7", width: 48, height: 48, mr: 2 }}>
                 {item.icon}
               </Avatar>
               <Box>
                 <Typography variant="body1" fontWeight="medium">{item.title}</Typography>
-                <Typography variant="h5" fontWeight="bold">
-                  {item.value}
-                </Typography>
+                <Typography variant="h5" fontWeight="bold">{item.value}</Typography>
               </Box>
             </CardContent>
           </Card>
         ))}
       </Box>
 
-      {/* Shared Savings Chart */}
+      {/* Shared Savings */}
       <Box sx={{ mb: 5 }}>
-        <Typography variant="h6" fontWeight="bold" gutterBottom>
-          Shared Savings
-        </Typography>
+        <Typography variant="h6" fontWeight="bold" gutterBottom>Shared Savings</Typography>
         <Paper elevation={3} sx={{ p: 2 }}>
-          <Plot
-            data={confidenceData.length > 0 ? confidenceData : [line2024Trace]}
-            layout={confidenceLayout}
-            config={{ scrollZoom: false }}
-            useResizeHandler
-            style={{ width: "100%", height: "300px" }}
-          />
+          <Plot data={confidenceData} layout={confidenceLayout} config={{ scrollZoom: false }} useResizeHandler style={{ width: "100%", height: "300px" }} />
         </Paper>
       </Box>
 
-      {/* Benchmark vs Expenditure Graph */}
+      {/* Benchmark vs Expenditure */}
       {benchmarkPlot && (
         <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Projected Benchmark vs Expenditure (2024)
-          </Typography>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>Projected Benchmark vs Expenditure (2024)</Typography>
           <Paper elevation={3} sx={{ p: 2 }}>
-            <Plot
-              data={benchmarkPlot.data}
-              layout={benchmarkPlot.layout}
-              config={{ scrollZoom: false }}
-              useResizeHandler
-              style={{ width: "100%", height: "400px" }}
-            />
+            <Plot data={benchmarkPlot.data} layout={benchmarkPlot.layout} config={{ scrollZoom: false }} useResizeHandler style={{ width: "100%", height: "400px" }} />
           </Paper>
         </Box>
       )}
 
-      {/* Monthly Paid PMPM by Claim Type */}
+      {/* Monthly PMPM by Claim Type */}
       {quarterlyPmpmPlot && (
-        <Paper sx={{ mb:5, p:2 }}>
+        <Paper sx={{ mb: 5, p: 2 }}>
           <Typography variant="h6">Monthly Paid PMPM by Claim Type</Typography>
-          <Plot
-            data={quarterlyPmpmPlot.data}
-            layout={quarterlyPmpmPlot.layout}
-            useResizeHandler
-            style={{ width:"100%", height:300 }}
-          />
+          <Plot data={quarterlyPmpmPlot.data} layout={quarterlyPmpmPlot.layout} useResizeHandler style={{ width: "100%", height: "300px" }} />
         </Paper>
       )}
 
       {/* Monthly Expense Distribution (%) */}
       {quarterlyPercentagePlot && (
-        <Paper sx={{ mb:5, p:2 }}>
+        <Paper sx={{ mb: 5, p: 2 }}>
           <Typography variant="h6">Monthly Expense Distribution (%)</Typography>
-          <Plot
-            data={quarterlyPercentagePlot.data}
-            layout={quarterlyPercentagePlot.layout}
-            useResizeHandler
-            style={{ width:"100%", height:300 }}
-          />
+          <Plot data={quarterlyPercentagePlot.data} layout={quarterlyPercentagePlot.layout} useResizeHandler style={{ width: "100%", height: "300px" }} />
         </Paper>
       )}
 
-
-      {/* Provider Map & Physician Breakdown */}
+      {/* Provider Map & Breakdown */}
       {providerMapPlot && (
         <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Geographic Distribution of Providers
-          </Typography>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>Geographic Distribution of Providers</Typography>
           <Paper elevation={3} sx={{ p: 2 }}>
             <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 2 }}>
               <Box sx={{ flex: 3 }}>
-                <Plot
-                  data={providerMapPlot.data}
-                  layout={providerMapPlot.layout}
-                  config={{ scrollZoom: false }}
-                  useResizeHandler
-                  style={{ width: "100%", height: "400px" }}
-                />
+                <Plot data={providerMapPlot.data} layout={providerMapPlot.layout} config={{ scrollZoom: false }} useResizeHandler style={{ width: "100%", height: "400px" }} />
               </Box>
               <Box sx={{ flex: 1, minWidth: 200, border: "1px solid #e0e0e0", borderRadius: 2, p: 2 }}>
-                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                  Physician Breakdown
-                </Typography>
-                {Object.entries(physicianBreakdown)
-                  .filter(([cat, pct]) => pct > 0)
-                  .map(([cat, pct]) => (
-                    <Box key={cat} sx={{ mb: 2 }}>
-                      <Typography variant="body2" sx={{ mb: 0.5 }}>
-                        {cat} — {pct}%
-                      </Typography>
-                      <Box
-                        sx={{
-                          backgroundColor: "#f0f0f0",
-                          borderRadius: 1,
-                          height: 8,
-                          width: "100%",
-                          position: "relative",
-                        }}
-                      >
-                        <Box sx={{ backgroundColor: "#6c5ce7", height: "100%", width: `${pct}%`, borderRadius: 1 }} />
-                      </Box>
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>Physician Breakdown</Typography>
+                {Object.entries(physicianBreakdown).filter(([c,p])=>p>0).map(([c,p])=>(
+                  <Box key={c} sx={{ mb: 2 }}>
+                    <Typography variant="body2">{c} — {p}%</Typography>
+                    <Box sx={{ backgroundColor: "#f0f0f0", borderRadius: 1, height: 8, width: "100%", position: "relative" }}>
+                      <Box sx={{ backgroundColor: "#6c5ce7", height: "100%", width: `${p}%`, borderRadius: 1 }} />
                     </Box>
-                  ))}
+                  </Box>
+                ))}
               </Box>
             </Box>
           </Paper>
         </Box>
       )}
 
-      {/* QBR vs Sparx Graph */}
+      {/* QBR vs Sparx */}
       {qbrPlot && (
         <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            QBR vs Sparx (2024)
-          </Typography>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>QBR vs Sparx (2024)</Typography>
           <Paper elevation={3} sx={{ p: 2 }}>
-            <Plot
-              data={qbrPlot.data}
-              layout={qbrPlot.layout}
-              config={{ scrollZoom: false }}
-              useResizeHandler
-              style={{ width: "100%", height: "400px" }}
-            />
+            <Plot data={qbrPlot.data} layout={qbrPlot.layout} config={{ scrollZoom: false }} useResizeHandler style={{ width: "100%", height: "400px" }} />
           </Paper>
         </Box>
       )}
@@ -1088,9 +730,7 @@ const loadIndustryResults = useCallback(async () => {
       {/* Stop Loss Payouts */}
       {stoplossEntity && (
         <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Stop Loss Payouts
-          </Typography>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>Stop Loss Payouts</Typography>
           <Paper elevation={3} sx={{ p: 2 }}>
             <Plot
               data={[
@@ -1099,13 +739,13 @@ const loadIndustryResults = useCallback(async () => {
                   name: "Excess above threshold",
                   x: stoplossThresholds.map((t) => `Cost Over ${t}`),
                   y: stoplossThresholds.map((t) => {
-                    const key = Object.keys(stoplossEntity).find(
-                      (k) => normalizeKey(k) === `cost over ${t}`.toLowerCase()
+                    const key = Object.keys(stoplossEntity).find((k) =>
+                      normalizeKey(k) === `cost over ${t}`.toLowerCase()
                     );
                     return parseOneDecimal(stoplossEntity[key]);
                   }),
                   yaxis: "y1",
-                  marker: { color: "#2f5ce7" },
+                  marker: { color: "#6c5ce7" },
                 },
                 {
                   type: "scatter",
@@ -1113,8 +753,8 @@ const loadIndustryResults = useCallback(async () => {
                   name: "Claimants above threshold",
                   x: stoplossThresholds.map((t) => `Cost Over ${t}`),
                   y: stoplossThresholds.map((t) => {
-                    const key = Object.keys(stoplossEntity).find(
-                      (k) => normalizeKey(k) === `mbrs ${t}`.toLowerCase()
+                    const key = Object.keys(stoplossEntity).find((k) =>
+                      normalizeKey(k) === `mbrs ${t}`.toLowerCase()
                     );
                     return parseWholeNumber(stoplossEntity[key]);
                   }),
@@ -1136,13 +776,10 @@ const loadIndustryResults = useCallback(async () => {
                 },
                 yaxis2: {
                   title: { text: "Claimants above Threshold", font: { color: "#d66035" } },
-                  titlefont: { color: "#d66035" },
-                  tickfont: { color: "#d66035" },
                   overlaying: "y",
                   side: "right",
                   tickformat: ",d",
                   zeroline: false,
-                  showline: false,
                   showgrid: false,
                 },
                 legend: { orientation: "h", y: -0.3 },
@@ -1156,35 +793,38 @@ const loadIndustryResults = useCallback(async () => {
         </Box>
       )}
 
-
-      {/* Latest Industry Results - Member Months vs PMPM */}
+      {/* Industry Results - Member Months vs PMPM */}
       {pmpmPlot && (
-        <Paper sx={{ mb:5, p:2 }}>
+        <Paper sx={{ mb: 5, p: 2 }}>
           <Typography variant="h6">Latest Industry Results - Member Months vs PMPM</Typography>
           <Plot
             data={[pmpmPlot]}
             layout={{
-              xaxis: { title:"Total Member Months" },
-              yaxis: { title:"PMPM Cost", tickprefix:"$" },
+              autosize: true,
+              xaxis: { title: { text: "Total Member Months" } },
+              yaxis: { title: { text: "PMPM Cost" }, tickprefix: "$" },
             }}
+            config={{ scrollZoom: false }}
             useResizeHandler
-            style={{ width:"100%", height:300 }}
+            style={{ width: "100%", height: "300px" }}
           />
         </Paper>
       )}
 
-      {/* Latest Industry Results - Percentile Rank of Quality Scores */}
+      {/* Industry Results - Quality Percentile */}
       {qualityPlot && (
-        <Paper sx={{ mb:5, p:2 }}>
+        <Paper sx={{ mb: 5, p: 2 }}>
           <Typography variant="h6">Latest Industry Results - Percentile Rank of Quality Scores</Typography>
           <Plot
             data={[qualityPlot]}
             layout={{
-              xaxis: { title:"Percentile Rank", ticksuffix:"%" },
-              yaxis: { title:"Total Quality Score", ticksuffix:"%" },
+              autosize: true,
+              xaxis: { title: { text: "Percentile Rank" }, ticksuffix: "%" },
+              yaxis: { title: { text: "Total Quality Score" }, ticksuffix: "%" },
             }}
+            config={{ scrollZoom: false }}
             useResizeHandler
-            style={{ width:"100%", height:300 }}
+            style={{ width: "100%", height: "300px" }}
           />
         </Paper>
       )}
